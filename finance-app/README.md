@@ -16,14 +16,22 @@ Kotlin, Jetpack Compose (Material 3), Room (SQLite) e Navigation Compose. Androi
 
 ## Obter o APK
 
-O workflow `.github/workflows/finance-app.yml` compila o APK a cada push que altera `finance-app/`.
-Abra a aba **Actions** do repositório, entre na execução mais recente de **Finance App APK** e baixe o artefato
-`MinhasFinancas-apk` (um `.zip` com o `app-release.apk`).
+A cada push que altera `finance-app/`, o workflow `.github/workflows/finance-app.yml` roda os testes, compila o APK
+e publica uma **Release** no GitHub. A versão mais recente fica sempre neste link (abra no celular):
+
+https://github.com/pmuzzipl-sudo/everything-claude-code/releases/latest/download/MinhasFinancas.apk
 
 No celular, permita a instalação de apps de fontes desconhecidas e abra o arquivo `.apk`.
 
-> O APK de release é assinado com a chave de debug, o que é suficiente para instalar no seu aparelho.
-> Para publicar na Play Store, configure uma keystore própria em `app/build.gradle.kts`.
+## Atualizar o app
+
+1. Aumente `versionCode` (e `versionName`) em `app/build.gradle.kts`.
+2. Se mudar as tabelas do banco (`data/Entities.kt`), aumente a `version` do `@Database` e adicione uma migração do Room.
+3. Faça o push, espere a release e instale o novo APK por cima do antigo: os dados são mantidos.
+
+O APK é assinado com a chave fixa `app/release.keystore` (senhas em `keystore.properties`). **Não apague nem troque
+esses arquivos**: com outra chave, o Android recusa a atualização e seria preciso desinstalar o app, perdendo os dados.
+Como este repositório é público, a chave também é pública; é aceitável apenas para uso pessoal.
 
 ## Compilar localmente
 
