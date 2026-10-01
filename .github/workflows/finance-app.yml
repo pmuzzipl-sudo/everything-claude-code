@@ -42,7 +42,10 @@ jobs:
           path: finance-app/MinhasFinancas.apk
           if-no-files-found: error
 
+      # Publica apenas quando o workflow é executado manualmente (Actions > Finance App APK > Run workflow).
+      # Pushes comuns só compilam e testam, gerando o APK como artefato.
       - name: Publicar release
+        if: github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ github.token }}
           NOTES: ${{ github.event.head_commit.message }}
