@@ -3,11 +3,14 @@ package app.financas.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.room.withTransaction
 import app.financas.data.Budget
 import app.financas.data.Category
 import app.financas.data.FinanceDatabase
+import app.financas.data.FixedExpense
 import app.financas.data.Transaction
 import app.financas.data.TransactionType
+import app.financas.data.toInstallments
 import app.financas.util.formatMoney
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
@@ -26,7 +29,8 @@ import java.time.YearMonth
 /** Percentual do orçamento a partir do qual o usuário é avisado. */
 const val BUDGET_WARNING_RATIO = 0.8
 
-data class MonthSummary(val incomeCents: Long = 0, val expenseCents: Long = 0) {
+data class MonthSummary(val incomeCents: Long = 0, val fixedCents: Long = 0, val variableCents: Long = 0) {
+    val expenseCents get() = fixedCents + variableCents
     val balanceCents get() = incomeCents - expenseCents
 }
 
@@ -46,6 +50,7 @@ data class FinanceUiState(
     val incomeByCategory: List<Pair<Category, Long>> = emptyList(),
     val history: List<MonthTotals> = emptyList(),
     val budgets: List<BudgetStatus> = emptyList(),
+    val fixedExpenses: List<FixedExpense> = emptyList(),
 )
 
 private const val HISTORY_MONTHS = 6L
@@ -59,7 +64,8 @@ private fun Transaction.month() = YearMonth.from(LocalDate.ofEpochDay(epochDay))
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class FinanceViewModel(application: Application) : AndroidViewModel(application) {
-    private val dao = FinanceDatabase.get(application).dao()
+    private val db = FinanceDatabase.get(application)
+    private val dao = db.dao()
 
     private val month = MutableStateFlow(YearMonth.now())
 
@@ -73,8 +79,8 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     }
 
     val state: StateFlow<FinanceUiState> =
-        combine(month, recentTransactions, dao.budgets()) { m, recent, budgets ->
-            buildState(m, recent, budgets)
+        combine(month, recentTransactions, dao.budgets(), dao.fixedExpenses()) { m, recent, budgets, fixed ->
+            buildState(m, recent, budgets).copy(fixedExpenses = fixed)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), FinanceUiState())
 
     fun previousMonth() = month.update { it.minusMonths(1) }
@@ -91,6 +97,34 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
 
     fun delete(transaction: Transaction) {
         viewModelScope.launch { dao.delete(transaction) }
+    }
+
+    suspend fun fixedExpense(id: Long): FixedExpense? = dao.fixedExpense(id)
+
+    /** Salva a despesa fixa e (re)gera todas as suas parcelas. */
+    fun saveFixedExpense(fixed: FixedExpense) {
+        viewModelScope.launch {
+            db.withTransaction {
+                val saved = if (fixed.id == 0L) {
+                    fixed.copy(id = dao.insert(fixed))
+                } else {
+                    dao.update(fixed)
+                    dao.deleteInstallments(fixed.id)
+                    fixed
+                }
+                dao.insertAll(saved.toInstallments())
+            }
+        }
+    }
+
+    /** Exclui a despesa fixa junto com todas as suas parcelas. */
+    fun deleteFixedExpense(fixed: FixedExpense) {
+        viewModelScope.launch {
+            db.withTransaction {
+                dao.deleteInstallments(fixed.id)
+                dao.deleteFixedExpense(fixed.id)
+            }
+        }
     }
 
     fun setBudget(category: Category, limitCents: Long?) {
@@ -135,7 +169,8 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
             transactions = current,
             summary = MonthSummary(
                 incomeCents = current.filter { it.type == TransactionType.INCOME }.sumOf { it.amountCents },
-                expenseCents = expenses.sumOf { it.amountCents },
+                fixedCents = expenses.filter { it.isFixed }.sumOf { it.amountCents },
+                variableCents = expenses.filterNot { it.isFixed }.sumOf { it.amountCents },
             ),
             expensesByCategory = spentByCategory.toList().sortedByDescending { it.second },
             incomeByCategory = current.filter { it.type == TransactionType.INCOME }

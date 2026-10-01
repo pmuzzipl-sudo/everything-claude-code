@@ -25,8 +25,14 @@ import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -44,6 +50,12 @@ import app.financas.util.DATE_FORMAT
 import app.financas.util.formatMoney
 import java.time.LocalDate
 
+private enum class HomeTab(val label: String, val filter: (Transaction) -> Boolean) {
+    VARIABLE("Variáveis", { it.type == TransactionType.EXPENSE && !it.isFixed }),
+    FIXED("Fixas", { it.type == TransactionType.EXPENSE && it.isFixed }),
+    INCOME("Receitas", { it.type == TransactionType.INCOME }),
+}
+
 @Composable
 fun HomeScreen(
     state: FinanceUiState,
@@ -53,6 +65,8 @@ fun HomeScreen(
     onOpen: (Transaction) -> Unit,
 ) {
     val alerts = state.budgets.filter { it.isOver || it.isNear }
+    var tab by rememberSaveable { mutableStateOf(HomeTab.VARIABLE) }
+    val shown = state.transactions.filter(tab.filter)
     Box(Modifier.fillMaxSize()) {
         LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 88.dp)) {
             item { MonthSelector(state.month, onPreviousMonth, onNextMonth) }
@@ -86,23 +100,44 @@ fun HomeScreen(
                 }
             }
             item {
-                Text(
-                    "Lançamentos",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(top = 20.dp, bottom = 4.dp),
-                )
+                TabRow(selectedTabIndex = tab.ordinal, modifier = Modifier.padding(top = 16.dp)) {
+                    HomeTab.entries.forEach { t ->
+                        Tab(
+                            selected = tab == t,
+                            onClick = { tab = t },
+                            text = { Text(t.label, maxLines = 1) },
+                        )
+                    }
+                }
+                Row(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                    Text(
+                        "${shown.size} lançamento" + if (shown.size == 1) "" else "s",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        "Total: ${formatMoney(shown.sumOf { it.amountCents })}",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
             }
-            if (state.transactions.isEmpty()) {
+            if (shown.isEmpty()) {
                 item {
                     Text(
-                        "Nenhum lançamento neste mês.\nToque em \"Novo\" para adicionar.",
+                        when (tab) {
+                            HomeTab.FIXED -> "Nenhuma despesa fixa neste mês.\nCadastre-as na aba \"Fixas\"."
+                            HomeTab.VARIABLE -> "Nenhuma despesa variável neste mês.\nToque em \"Novo\" para adicionar."
+                            HomeTab.INCOME -> "Nenhuma receita neste mês.\nToque em \"Novo\" para adicionar."
+                        },
                         textAlign = TextAlign.Center,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
                     )
                 }
             }
-            items(state.transactions, key = { it.id }) { t ->
+            items(shown, key = { it.id }) { t ->
                 TransactionRow(t, onClick = { onOpen(t) })
                 HorizontalDivider()
             }
@@ -140,6 +175,14 @@ private fun SummaryCard(state: FinanceUiState) {
                 Column(horizontalAlignment = Alignment.End) {
                     Text("Despesas", style = MaterialTheme.typography.labelMedium)
                     Text(formatMoney(s.expenseCents), color = ExpenseColor, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        "Fixas ${formatMoney(s.fixedCents)}",
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                    Text(
+                        "Variáveis ${formatMoney(s.variableCents)}",
+                        style = MaterialTheme.typography.labelSmall,
+                    )
                 }
             }
         }
@@ -163,7 +206,11 @@ private fun TransactionRow(t: Transaction, onClick: () -> Unit) {
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                "${t.category.label} • ${LocalDate.ofEpochDay(t.epochDay).format(DATE_FORMAT)}",
+                buildString {
+                    append(t.category.label)
+                    if (t.installment != null) append(" • parcela ${t.installment}/${t.installmentCount}")
+                    append(" • ${LocalDate.ofEpochDay(t.epochDay).format(DATE_FORMAT)}")
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

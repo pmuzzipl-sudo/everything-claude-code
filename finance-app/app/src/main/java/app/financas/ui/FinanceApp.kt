@@ -3,6 +3,7 @@ package app.financas.ui
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.EventRepeat
 import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material3.Icon
@@ -32,17 +33,22 @@ import app.financas.data.Category
 import app.financas.ui.screens.BudgetScreen
 import app.financas.ui.screens.CategoryDetailScreen
 import app.financas.ui.screens.ChartsScreen
+import app.financas.ui.screens.EditFixedExpenseScreen
 import app.financas.ui.screens.EditTransactionScreen
+import app.financas.ui.screens.FixedExpensesScreen
 import app.financas.ui.screens.HomeScreen
 
 private enum class Tab(val route: String, val label: String, val icon: ImageVector) {
     HOME("home", "Início", Icons.Filled.AccountBalanceWallet),
     CHARTS("charts", "Gráficos", Icons.Filled.PieChart),
+    FIXED("fixed", "Fixas", Icons.Filled.EventRepeat),
     BUDGET("budget", "Orçamento", Icons.Filled.Savings),
 }
 
 private const val EDIT_ROUTE = "edit?id={id}"
 private const val CATEGORY_ROUTE = "category/{category}"
+private const val EDIT_FIXED_ROUTE = "fixed/edit?id={id}"
+private fun editFixedRoute(id: Long?) = if (id == null) "fixed/edit" else "fixed/edit?id=$id"
 private fun editRoute(id: Long?) = if (id == null) "edit" else "edit?id=$id"
 
 @Composable
@@ -106,6 +112,26 @@ fun FinanceApp(vm: FinanceViewModel = viewModel()) {
                     onPreviousMonth = vm::previousMonth,
                     onNextMonth = vm::nextMonth,
                     onOpen = { nav.navigate(editRoute(it.id)) },
+                    onBack = { nav.popBackStack() },
+                )
+            }
+            composable(Tab.FIXED.route) {
+                FixedExpensesScreen(
+                    fixedExpenses = state.fixedExpenses,
+                    onAdd = { nav.navigate(editFixedRoute(null)) },
+                    onOpen = { nav.navigate(editFixedRoute(it.id)) },
+                )
+            }
+            composable(
+                EDIT_FIXED_ROUTE,
+                arguments = listOf(navArgument("id") { type = NavType.LongType; defaultValue = -1L }),
+            ) { entry ->
+                val id = entry.arguments?.getLong("id")?.takeIf { it > 0 }
+                EditFixedExpenseScreen(
+                    id = id,
+                    load = vm::fixedExpense,
+                    onSave = { vm.saveFixedExpense(it); nav.popBackStack() },
+                    onDelete = { vm.deleteFixedExpense(it); nav.popBackStack() },
                     onBack = { nav.popBackStack() },
                 )
             }

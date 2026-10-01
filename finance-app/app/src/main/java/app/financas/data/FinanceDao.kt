@@ -2,7 +2,9 @@ package app.financas.data
 
 import androidx.room.Dao
 import androidx.room.Delete
+import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Update
 import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
 
@@ -37,4 +39,25 @@ interface FinanceDao {
 
     @Query("DELETE FROM budgets WHERE category = :category")
     suspend fun deleteBudget(category: Category)
+
+    @Query("SELECT * FROM fixed_expenses ORDER BY startEpochMonth DESC, id DESC")
+    fun fixedExpenses(): Flow<List<FixedExpense>>
+
+    @Query("SELECT * FROM fixed_expenses WHERE id = :id")
+    suspend fun fixedExpense(id: Long): FixedExpense?
+
+    @Insert
+    suspend fun insert(fixedExpense: FixedExpense): Long
+
+    @Update
+    suspend fun update(fixedExpense: FixedExpense)
+
+    @Query("DELETE FROM fixed_expenses WHERE id = :id")
+    suspend fun deleteFixedExpense(id: Long)
+
+    @Insert
+    suspend fun insertAll(transactions: List<Transaction>)
+
+    @Query("DELETE FROM transactions WHERE fixedExpenseId = :fixedExpenseId")
+    suspend fun deleteInstallments(fixedExpenseId: Long)
 }

@@ -27,6 +27,7 @@ import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -121,8 +122,17 @@ fun EditTransactionScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            val installmentOf = original?.takeIf { it.isFixed }
+            if (installmentOf != null) {
+                Text(
+                    "Parcela ${installmentOf.installment}/${installmentOf.installmentCount} de uma despesa fixa. " +
+                        "Alterações aqui valem só para esta parcela; para mudar todas, edite a despesa na aba \"Fixas\".",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             val types = listOf(TransactionType.EXPENSE to "Despesa", TransactionType.INCOME to "Receita")
-            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+            if (installmentOf == null) SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                 types.forEachIndexed { index, (value, label) ->
                     SegmentedButton(
                         selected = type == value,
@@ -185,9 +195,10 @@ fun EditTransactionScreen(
                 onClick = {
                     triedSave = true
                     if (cents != null) {
+                        // copy() mantém o vínculo da parcela com a despesa fixa ao editar.
+                        val base = original ?: Transaction(type = type, amountCents = 0, description = "", category = category, epochDay = 0)
                         onSave(
-                            Transaction(
-                                id = original?.id ?: 0,
+                            base.copy(
                                 type = type,
                                 amountCents = cents,
                                 description = description.trim(),
@@ -237,7 +248,7 @@ fun EditTransactionScreen(
 }
 
 @Composable
-private fun CategoryPicker(type: TransactionType, selected: Category, onSelect: (Category) -> Unit) {
+fun CategoryPicker(type: TransactionType, selected: Category, onSelect: (Category) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
         OutlinedTextField(

@@ -6,8 +6,12 @@ no próprio celular.
 ## Funcionalidades
 
 - **Receitas e despesas**: lançamentos com valor, descrição, categoria e data. Toque em um item para editar ou excluir.
-- **Saldo mensal**: resumo do mês com receitas, despesas e saldo; navegue entre os meses.
-- **Gráficos**: gráfico de rosca com as despesas por categoria e gráfico de barras com receitas e despesas dos últimos 6 meses.
+- **Saldo mensal**: resumo do mês com receitas, despesas (fixas e variáveis) e saldo; navegue entre os meses.
+  Os lançamentos do mês ficam separados nas abas **Variáveis**, **Fixas** e **Receitas**.
+- **Despesas fixas**: na aba **Fixas**, cadastre uma despesa com valor total, número de parcelas, mês de início e dia
+  do vencimento. O app divide o valor e lança cada parcela automaticamente no mês correspondente.
+- **Gráficos**: gráfico de rosca com despesas ou receitas por categoria e gráfico de barras dos últimos 6 meses.
+  Toque em uma categoria para ver os lançamentos dela, agrupados por descrições parecidas.
 - **Orçamento mensal**: defina um limite por categoria de despesa. O app avisa quando você atinge 80% do limite e quando ultrapassa.
 
 ## Tecnologia
