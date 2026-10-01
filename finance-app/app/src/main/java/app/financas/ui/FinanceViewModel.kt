@@ -43,6 +43,7 @@ data class FinanceUiState(
     val transactions: List<Transaction> = emptyList(),
     val summary: MonthSummary = MonthSummary(),
     val expensesByCategory: List<Pair<Category, Long>> = emptyList(),
+    val incomeByCategory: List<Pair<Category, Long>> = emptyList(),
     val history: List<MonthTotals> = emptyList(),
     val budgets: List<BudgetStatus> = emptyList(),
 )
@@ -51,6 +52,9 @@ private const val HISTORY_MONTHS = 6L
 
 private fun YearMonth.firstDay() = atDay(1).toEpochDay()
 private fun YearMonth.lastDay() = atEndOfMonth().toEpochDay()
+private fun List<Transaction>.totalsByCategory() =
+    groupBy { it.category }.mapValues { (_, list) -> list.sumOf { it.amountCents } }
+
 private fun Transaction.month() = YearMonth.from(LocalDate.ofEpochDay(epochDay))
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -113,7 +117,7 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     private fun buildState(m: YearMonth, recent: List<Transaction>, budgets: List<Budget>): FinanceUiState {
         val current = recent.filter { it.month() == m }
         val expenses = current.filter { it.type == TransactionType.EXPENSE }
-        val spentByCategory = expenses.groupBy { it.category }.mapValues { (_, list) -> list.sumOf { it.amountCents } }
+        val spentByCategory = expenses.totalsByCategory()
         val limits = budgets.associate { it.category to it.limitCents }
 
         val history = (HISTORY_MONTHS - 1 downTo 0).map { back ->
@@ -134,6 +138,8 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
                 expenseCents = expenses.sumOf { it.amountCents },
             ),
             expensesByCategory = spentByCategory.toList().sortedByDescending { it.second },
+            incomeByCategory = current.filter { it.type == TransactionType.INCOME }
+                .totalsByCategory().toList().sortedByDescending { it.second },
             history = history,
             budgets = Category.of(TransactionType.EXPENSE).map { c ->
                 BudgetStatus(c, limits[c], spentByCategory[c] ?: 0)

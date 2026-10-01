@@ -28,7 +28,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import app.financas.data.Category
 import app.financas.ui.screens.BudgetScreen
+import app.financas.ui.screens.CategoryDetailScreen
 import app.financas.ui.screens.ChartsScreen
 import app.financas.ui.screens.EditTransactionScreen
 import app.financas.ui.screens.HomeScreen
@@ -40,6 +42,7 @@ private enum class Tab(val route: String, val label: String, val icon: ImageVect
 }
 
 private const val EDIT_ROUTE = "edit?id={id}"
+private const val CATEGORY_ROUTE = "category/{category}"
 private fun editRoute(id: Long?) = if (id == null) "edit" else "edit?id=$id"
 
 @Composable
@@ -57,7 +60,7 @@ fun FinanceApp(vm: FinanceViewModel = viewModel()) {
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
         bottomBar = {
-            if (currentRoute != EDIT_ROUTE) {
+            if (Tab.entries.any { it.route == currentRoute }) {
                 NavigationBar {
                     Tab.entries.forEach { tab ->
                         NavigationBarItem(
@@ -88,7 +91,23 @@ fun FinanceApp(vm: FinanceViewModel = viewModel()) {
                 )
             }
             composable(Tab.CHARTS.route) {
-                ChartsScreen(state, onPreviousMonth = vm::previousMonth, onNextMonth = vm::nextMonth)
+                ChartsScreen(
+                    state = state,
+                    onPreviousMonth = vm::previousMonth,
+                    onNextMonth = vm::nextMonth,
+                    onOpenCategory = { nav.navigate("category/${it.name}") },
+                )
+            }
+            composable(CATEGORY_ROUTE) { entry ->
+                val category = Category.valueOf(entry.arguments?.getString("category") ?: return@composable)
+                CategoryDetailScreen(
+                    category = category,
+                    state = state,
+                    onPreviousMonth = vm::previousMonth,
+                    onNextMonth = vm::nextMonth,
+                    onOpen = { nav.navigate(editRoute(it.id)) },
+                    onBack = { nav.popBackStack() },
+                )
             }
             composable(Tab.BUDGET.route) {
                 BudgetScreen(

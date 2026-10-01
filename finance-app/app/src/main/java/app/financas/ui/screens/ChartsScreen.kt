@@ -1,6 +1,10 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
+
 package app.financas.ui.screens
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,27 +22,51 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Card
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import app.financas.data.Category
+import app.financas.data.TransactionType
 import app.financas.ui.FinanceUiState
 import app.financas.ui.MonthTotals
 import app.financas.ui.theme.ExpenseColor
 import app.financas.ui.theme.IncomeColor
 import app.financas.util.formatMoney
 import app.financas.util.shortLabel
+import kotlin.math.atan2
+import kotlin.math.sqrt
 
 @Composable
-fun ChartsScreen(state: FinanceUiState, onPreviousMonth: () -> Unit, onNextMonth: () -> Unit) {
+fun ChartsScreen(
+    state: FinanceUiState,
+    onPreviousMonth: () -> Unit,
+    onNextMonth: () -> Unit,
+    onOpenCategory: (Category) -> Unit,
+) {
+    var type by rememberSaveable { mutableStateOf(TransactionType.EXPENSE) }
+    val byCategory = if (type == TransactionType.EXPENSE) state.expensesByCategory else state.incomeByCategory
+
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
     ) {
@@ -46,15 +74,28 @@ fun ChartsScreen(state: FinanceUiState, onPreviousMonth: () -> Unit, onNextMonth
 
         Card(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp)) {
-                Text("Despesas por categoria", style = MaterialTheme.typography.titleMedium)
+                val types = listOf(TransactionType.EXPENSE to "Despesas", TransactionType.INCOME to "Receitas")
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    types.forEachIndexed { index, (value, label) ->
+                        SegmentedButton(
+                            selected = type == value,
+                            onClick = { type = value },
+                            shape = SegmentedButtonDefaults.itemShape(index, types.size),
+                        ) { Text(label) }
+                    }
+                }
                 Spacer(Modifier.height(16.dp))
-                val total = state.expensesByCategory.sumOf { it.second }
+                val total = byCategory.sumOf { it.second }
                 if (total == 0L) {
-                    Text("Sem despesas neste mês.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        if (type == TransactionType.EXPENSE) "Sem despesas neste mês." else "Sem receitas neste mês.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 } else {
                     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                         DonutChart(
-                            slices = state.expensesByCategory.map { (c, v) -> Color(c.color) to v.toFloat() },
+                            slices = byCategory.map { (c, v) -> Color(c.color) to v.toFloat() },
+                            onSliceClick = { onOpenCategory(byCategory[it].first) },
                             modifier = Modifier.size(200.dp),
                         )
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -62,10 +103,20 @@ fun ChartsScreen(state: FinanceUiState, onPreviousMonth: () -> Unit, onNextMonth
                             Text(formatMoney(total), fontWeight = FontWeight.Bold)
                         }
                     }
-                    Spacer(Modifier.height(16.dp))
-                    state.expensesByCategory.forEach { (category, value) ->
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Toque em uma categoria para ver os detalhes",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.align(Alignment.CenterHorizontally),
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    byCategory.forEach { (category, value) ->
                         Row(
-                            Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable { onOpenCategory(category) }
+                                .padding(vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Box(Modifier.size(12.dp).background(Color(category.color), CircleShape))
@@ -77,6 +128,11 @@ fun ChartsScreen(state: FinanceUiState, onPreviousMonth: () -> Unit, onNextMonth
                                 modifier = Modifier.padding(end = 12.dp),
                             )
                             Text(formatMoney(value), fontWeight = FontWeight.SemiBold)
+                            Icon(
+                                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                     }
                 }
@@ -111,9 +167,28 @@ private fun Legend(color: Color, label: String) {
 }
 
 @Composable
-private fun DonutChart(slices: List<Pair<Color, Float>>, modifier: Modifier = Modifier) {
+private fun DonutChart(slices: List<Pair<Color, Float>>, onSliceClick: (Int) -> Unit, modifier: Modifier = Modifier) {
     val total = slices.sumOf { it.second.toDouble() }.toFloat()
-    Canvas(modifier) {
+    Canvas(
+        modifier.pointerInput(slices) {
+            detectTapGestures { tap ->
+                val outer = size.width.coerceAtMost(size.height) / 2f
+                val dx = tap.x - size.width / 2f
+                val dy = tap.y - size.height / 2f
+                val distance = sqrt(dx * dx + dy * dy)
+                // Só reage a toques sobre o anel, não no centro.
+                if (distance < outer * 0.55f || distance > outer) return@detectTapGestures
+                // Ângulo a partir do topo, em sentido horário, igual ao desenho.
+                val angle = (Math.toDegrees(atan2(dy, dx).toDouble()).toFloat() + 90f + 360f) % 360f
+                var end = 0f
+                val index = slices.indexOfFirst { (_, value) ->
+                    end += 360f * value / total
+                    angle <= end
+                }
+                onSliceClick(if (index >= 0) index else slices.lastIndex)
+            }
+        },
+    ) {
         val stroke = size.minDimension * 0.18f
         val diameter = size.minDimension - stroke
         val topLeft = Offset((size.width - diameter) / 2, (size.height - diameter) / 2)
