@@ -12,6 +12,8 @@ no próprio celular.
   do vencimento. O app divide o valor e lança cada parcela automaticamente no mês correspondente.
 - **Gráficos**: gráfico de rosca com despesas ou receitas por categoria e gráfico de barras dos últimos 6 meses.
   Toque em uma categoria para ver os lançamentos dela, agrupados por descrições parecidas.
+- **Comparativo**: na aba Comparativo dos gráficos, compare as despesas de cada categoria mês a mês, com filtros de
+  período (3, 6 ou 12 meses), tipo (fixas/variáveis) e categorias, e a variação em relação ao mês anterior.
 - **Orçamento mensal**: defina um limite por categoria de despesa. O app avisa quando você atinge 80% do limite e quando ultrapassa.
 
 ## Tecnologia

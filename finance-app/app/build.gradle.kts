@@ -15,8 +15,8 @@ android {
         applicationId = "app.financas"
         minSdk = 26
         targetSdk = 34
-        versionCode = 4
-        versionName = "1.3"
+        versionCode = 5
+        versionName = "1.4"
     }
 
     // Chave fixa: toda versão precisa da mesma assinatura para atualizar o app sem desinstalar.

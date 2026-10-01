@@ -39,4 +39,7 @@ fun YearMonth.label(): String {
 fun YearMonth.shortLabel(): String =
     month.getDisplayName(TextStyle.SHORT, PT_BR).trimEnd('.').replaceFirstChar { it.uppercase(PT_BR) }
 
+/** "Out/26" */
+fun YearMonth.compactLabel(): String = "${shortLabel()}/${year % 100}"
+
 val DATE_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy", PT_BR)

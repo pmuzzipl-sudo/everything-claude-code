@@ -49,11 +49,16 @@ data class FinanceUiState(
     val expensesByCategory: List<Pair<Category, Long>> = emptyList(),
     val incomeByCategory: List<Pair<Category, Long>> = emptyList(),
     val history: List<MonthTotals> = emptyList(),
+    /** Lançamentos dos últimos [LOADED_MONTHS] meses até o mês selecionado. */
+    val recentTransactions: List<Transaction> = emptyList(),
     val budgets: List<BudgetStatus> = emptyList(),
     val fixedExpenses: List<FixedExpense> = emptyList(),
 )
 
 private const val HISTORY_MONTHS = 6L
+
+/** Meses carregados até o mês selecionado; o comparativo dos gráficos usa até 12. */
+const val LOADED_MONTHS = 12
 
 private fun YearMonth.firstDay() = atDay(1).toEpochDay()
 private fun YearMonth.lastDay() = atEndOfMonth().toEpochDay()
@@ -73,9 +78,9 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
     /** Mensagens únicas (avisos de orçamento) para exibir em Snackbar. */
     val events = messages.receiveAsFlow()
 
-    // Carrega o mês selecionado e os anteriores de uma vez, para o gráfico de histórico.
+    // Carrega o mês selecionado e os anteriores de uma vez, para o histórico e o comparativo.
     private val recentTransactions = month.flatMapLatest { m ->
-        dao.transactionsBetween(m.minusMonths(HISTORY_MONTHS - 1).firstDay(), m.lastDay())
+        dao.transactionsBetween(m.minusMonths(LOADED_MONTHS - 1L).firstDay(), m.lastDay())
     }
 
     val state: StateFlow<FinanceUiState> =
@@ -176,6 +181,7 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
             incomeByCategory = current.filter { it.type == TransactionType.INCOME }
                 .totalsByCategory().toList().sortedByDescending { it.second },
             history = history,
+            recentTransactions = recent,
             budgets = Category.of(TransactionType.EXPENSE).map { c ->
                 BudgetStatus(c, limits[c], spentByCategory[c] ?: 0)
             },

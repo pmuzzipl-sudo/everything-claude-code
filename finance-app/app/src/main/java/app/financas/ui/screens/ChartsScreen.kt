@@ -30,10 +30,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -59,6 +62,28 @@ import kotlin.math.sqrt
 
 @Composable
 fun ChartsScreen(
+    state: FinanceUiState,
+    onPreviousMonth: () -> Unit,
+    onNextMonth: () -> Unit,
+    onOpenCategory: (Category) -> Unit,
+) {
+    var tab by rememberSaveable { mutableIntStateOf(0) }
+    Column(Modifier.fillMaxSize()) {
+        TabRow(selectedTabIndex = tab) {
+            listOf("Resumo", "Comparativo").forEachIndexed { i, label ->
+                Tab(selected = tab == i, onClick = { tab = i }, text = { Text(label) })
+            }
+        }
+        if (tab == 0) {
+            SummaryTab(state, onPreviousMonth, onNextMonth, onOpenCategory)
+        } else {
+            ComparisonTab(state, onPreviousMonth, onNextMonth, onOpenCategory)
+        }
+    }
+}
+
+@Composable
+private fun SummaryTab(
     state: FinanceUiState,
     onPreviousMonth: () -> Unit,
     onNextMonth: () -> Unit,
