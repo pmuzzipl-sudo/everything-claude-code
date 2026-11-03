@@ -1,0 +1,9 @@
+<resources>
+    <!-- Escuro desde a abertura, sem flash branco; barras do sistema na mesma cor do app.
+         AppCompat: necessário para o diálogo de digital em aparelhos mais antigos. -->
+    <style name="Theme.MinhasFinancas" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">@color/app_background</item>
+        <item name="android:statusBarColor">@color/app_background</item>
+        <item name="android:navigationBarColor">@color/app_bars</item>
+    </style>
+</resources>
