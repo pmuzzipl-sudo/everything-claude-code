@@ -1,0 +1,22 @@
+{
+  "_comment": "PROVISÓRIO: substituir pelo google-services.json do projeto Firebase. Serve só para compilar.",
+  "project_info": {
+    "project_number": "000000000000",
+    "project_id": "placeholder-financas",
+    "storage_bucket": "placeholder-financas.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:000000000000:android:0000000000000000",
+        "android_client_info": { "package_name": "app.financas" }
+      },
+      "oauth_client": [
+        { "client_id": "000000000000-placeholder.apps.googleusercontent.com", "client_type": 3 }
+      ],
+      "api_key": [ { "current_key": "placeholder" } ],
+      "services": { "appinvite_service": { "other_platform_oauth_client": [] } }
+    }
+  ],
+  "configuration_version": "1"
+}

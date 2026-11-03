@@ -21,7 +21,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -52,7 +51,7 @@ private fun editFixedRoute(id: Long?) = if (id == null) "fixed/edit" else "fixed
 private fun editRoute(id: Long?) = if (id == null) "edit" else "edit?id=$id"
 
 @Composable
-fun FinanceApp(vm: FinanceViewModel = viewModel()) {
+fun FinanceApp(vm: FinanceViewModel, accountEmail: String?, onSignOut: () -> Unit) {
     val nav = rememberNavController()
     val state by vm.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
@@ -94,6 +93,8 @@ fun FinanceApp(vm: FinanceViewModel = viewModel()) {
                     onNextMonth = vm::nextMonth,
                     onAdd = { nav.navigate(editRoute(null)) },
                     onOpen = { nav.navigate(editRoute(it.id)) },
+                    accountEmail = accountEmail,
+                    onSignOut = onSignOut,
                 )
             }
             composable(Tab.CHARTS.route) {

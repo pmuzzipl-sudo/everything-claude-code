@@ -60,4 +60,14 @@ interface FinanceDao {
 
     @Query("DELETE FROM transactions WHERE fixedExpenseId = :fixedExpenseId")
     suspend fun deleteInstallments(fixedExpenseId: Long)
+
+    // Leitura completa usada só para enviar os dados antigos (anteriores à sincronização) para a nuvem.
+    @Query("SELECT * FROM transactions")
+    suspend fun allTransactions(): List<Transaction>
+
+    @Query("SELECT * FROM budgets")
+    suspend fun allBudgets(): List<Budget>
+
+    @Query("SELECT * FROM fixed_expenses")
+    suspend fun allFixedExpenses(): List<FixedExpense>
 }

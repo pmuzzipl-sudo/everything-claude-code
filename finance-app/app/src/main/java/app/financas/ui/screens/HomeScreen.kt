@@ -18,7 +18,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -28,9 +30,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -63,7 +67,10 @@ fun HomeScreen(
     onNextMonth: () -> Unit,
     onAdd: () -> Unit,
     onOpen: (Transaction) -> Unit,
+    accountEmail: String?,
+    onSignOut: () -> Unit,
 ) {
+    var confirmSignOut by remember { mutableStateOf(false) }
     val alerts = state.budgets.filter { it.isOver || it.isNear }
     var tab by rememberSaveable { mutableStateOf(HomeTab.VARIABLE) }
     val shown = state.transactions.filter(tab.filter)
@@ -141,12 +148,42 @@ fun HomeScreen(
                 TransactionRow(t, onClick = { onOpen(t) })
                 HorizontalDivider()
             }
+            item {
+                Row(Modifier.fillMaxWidth().padding(top = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Filled.CloudDone,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Text(
+                        "Sincronizado com ${accountEmail ?: "sua conta"}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f).padding(start = 6.dp),
+                    )
+                    TextButton(onClick = { confirmSignOut = true }) { Text("Sair") }
+                }
+            }
         }
         ExtendedFloatingActionButton(
             onClick = onAdd,
             icon = { Icon(Icons.Filled.Add, contentDescription = null) },
             text = { Text("Novo") },
             modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+        )
+    }
+    if (confirmSignOut) {
+        AlertDialog(
+            onDismissRequest = { confirmSignOut = false },
+            title = { Text("Sair da conta?") },
+            text = { Text("Seus dados continuam salvos na nuvem. Entre de novo com a mesma conta para vê-los.") },
+            confirmButton = {
+                TextButton(onClick = { confirmSignOut = false; onSignOut() }) { Text("Sair") }
+            },
+            dismissButton = { TextButton(onClick = { confirmSignOut = false }) { Text("Cancelar") } },
         )
     }
 }

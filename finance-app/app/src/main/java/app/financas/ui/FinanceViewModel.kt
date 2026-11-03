@@ -1,16 +1,13 @@
 package app.financas.ui
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.room.withTransaction
 import app.financas.data.Budget
 import app.financas.data.Category
-import app.financas.data.FinanceDatabase
+import app.financas.data.FinanceRepository
 import app.financas.data.FixedExpense
 import app.financas.data.Transaction
 import app.financas.data.TransactionType
-import app.financas.data.toInstallments
 import app.financas.util.formatMoney
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
@@ -68,10 +65,7 @@ private fun List<Transaction>.totalsByCategory() =
 private fun Transaction.month() = YearMonth.from(LocalDate.ofEpochDay(epochDay))
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class FinanceViewModel(application: Application) : AndroidViewModel(application) {
-    private val db = FinanceDatabase.get(application)
-    private val dao = db.dao()
-
+class FinanceViewModel(private val repo: FinanceRepository) : ViewModel() {
     private val month = MutableStateFlow(YearMonth.now())
 
     private val messages = Channel<String>(Channel.BUFFERED)
@@ -80,68 +74,48 @@ class FinanceViewModel(application: Application) : AndroidViewModel(application)
 
     // Carrega o mês selecionado e os anteriores de uma vez, para o histórico e o comparativo.
     private val recentTransactions = month.flatMapLatest { m ->
-        dao.transactionsBetween(m.minusMonths(LOADED_MONTHS - 1L).firstDay(), m.lastDay())
+        repo.transactionsBetween(m.minusMonths(LOADED_MONTHS - 1L).firstDay(), m.lastDay())
     }
 
     val state: StateFlow<FinanceUiState> =
-        combine(month, recentTransactions, dao.budgets(), dao.fixedExpenses()) { m, recent, budgets, fixed ->
+        combine(month, recentTransactions, repo.budgets(), repo.fixedExpenses()) { m, recent, budgets, fixed ->
             buildState(m, recent, budgets).copy(fixedExpenses = fixed)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), FinanceUiState())
 
     fun previousMonth() = month.update { it.minusMonths(1) }
     fun nextMonth() = month.update { it.plusMonths(1) }
 
-    suspend fun transaction(id: Long): Transaction? = dao.transaction(id)
+    suspend fun transaction(id: Long): Transaction? = repo.transaction(id)
 
     fun save(transaction: Transaction) {
-        viewModelScope.launch {
-            dao.upsert(transaction)
-            if (transaction.type == TransactionType.EXPENSE) checkBudget(transaction)
-        }
+        repo.save(transaction)
+        if (transaction.type == TransactionType.EXPENSE) viewModelScope.launch { runCatching { checkBudget(transaction) } }
     }
 
-    fun delete(transaction: Transaction) {
-        viewModelScope.launch { dao.delete(transaction) }
-    }
+    fun delete(transaction: Transaction) = repo.delete(transaction)
 
-    suspend fun fixedExpense(id: Long): FixedExpense? = dao.fixedExpense(id)
+    suspend fun fixedExpense(id: Long): FixedExpense? = repo.fixedExpense(id)
 
-    /** Salva a despesa fixa e (re)gera todas as suas parcelas. */
     fun saveFixedExpense(fixed: FixedExpense) {
         viewModelScope.launch {
-            db.withTransaction {
-                val saved = if (fixed.id == 0L) {
-                    fixed.copy(id = dao.insert(fixed))
-                } else {
-                    dao.update(fixed)
-                    dao.deleteInstallments(fixed.id)
-                    fixed
-                }
-                dao.insertAll(saved.toInstallments())
-            }
+            runCatching { repo.saveFixedExpense(fixed) }
+                .onFailure { messages.send("Não foi possível salvar a despesa fixa. Verifique a internet e tente de novo.") }
         }
     }
 
-    /** Exclui a despesa fixa junto com todas as suas parcelas. */
     fun deleteFixedExpense(fixed: FixedExpense) {
         viewModelScope.launch {
-            db.withTransaction {
-                dao.deleteInstallments(fixed.id)
-                dao.deleteFixedExpense(fixed.id)
-            }
+            runCatching { repo.deleteFixedExpense(fixed) }
+                .onFailure { messages.send("Não foi possível excluir a despesa fixa. Verifique a internet e tente de novo.") }
         }
     }
 
-    fun setBudget(category: Category, limitCents: Long?) {
-        viewModelScope.launch {
-            if (limitCents == null) dao.deleteBudget(category) else dao.upsert(Budget(category, limitCents))
-        }
-    }
+    fun setBudget(category: Category, limitCents: Long?) = repo.setBudget(category, limitCents)
 
     private suspend fun checkBudget(transaction: Transaction) {
-        val limit = dao.budget(transaction.category)?.limitCents ?: return
+        val limit = repo.budget(transaction.category)?.limitCents ?: return
         val m = transaction.month()
-        val spent = dao.expenseTotal(transaction.category, m.firstDay(), m.lastDay())
+        val spent = repo.expenseTotal(transaction.category, m.firstDay(), m.lastDay())
         val name = transaction.category.label
         when {
             spent > limit -> messages.send(

@@ -50,6 +50,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           NOTES: ${{ github.event.head_commit.message }}
         run: |
+          # Não publica um APK com o google-services.json provisório (a sincronização não funcionaria).
+          if grep -q placeholder app/google-services.json; then
+            echo "::error::google-services.json provisório: substitua pelo arquivo do Firebase antes da release."
+            exit 1
+          fi
           gh release create "build-${{ github.run_number }}" MinhasFinancas.apk \
             --target "${{ github.sha }}" \
             --title "Minhas Finanças v${{ steps.apk.outputs.version }} (build ${{ github.run_number }})" \
