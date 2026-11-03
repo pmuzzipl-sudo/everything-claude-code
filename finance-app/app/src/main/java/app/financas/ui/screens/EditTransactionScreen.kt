@@ -7,6 +7,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -31,6 +32,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -45,6 +47,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -74,6 +77,7 @@ fun EditTransactionScreen(
     var description by rememberSaveable { mutableStateOf("") }
     var category by rememberSaveable { mutableStateOf(Category.FOOD) }
     var epochDay by rememberSaveable { mutableStateOf(LocalDate.now().toEpochDay()) }
+    var paid by rememberSaveable { mutableStateOf(true) }
     var loaded by rememberSaveable { mutableStateOf(id == null) }
     var showDatePicker by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
@@ -89,6 +93,7 @@ fun EditTransactionScreen(
             description = t.description
             category = t.category
             epochDay = t.epochDay
+            paid = t.paid
             loaded = true
         }
     }
@@ -125,8 +130,9 @@ fun EditTransactionScreen(
             val installmentOf = original?.takeIf { it.isFixed }
             if (installmentOf != null) {
                 Text(
-                    "Parcela ${installmentOf.installment}/${installmentOf.installmentCount} de uma despesa fixa. " +
-                        "Alterações aqui valem só para esta parcela; para mudar todas, edite a despesa na aba \"Fixas\".",
+                    (if (installmentOf.installmentCount != null) "Parcela ${installmentOf.installment}/${installmentOf.installmentCount}"
+                    else "Lançamento mensal") + " de uma ${if (installmentOf.type == TransactionType.INCOME) "receita" else "despesa"} fixa. " +
+                        "Alterações aqui valem só para este mês; para mudar todos, edite na aba \"Fixas\".",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -171,6 +177,18 @@ fun EditTransactionScreen(
 
             CategoryPicker(type, category, onSelect = { category = it })
 
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(if (type == TransactionType.INCOME) "Recebido" else "Pago", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        if (type == TransactionType.INCOME) "Desmarque se ainda vai receber" else "Desmarque se ainda vai pagar (aparece em \"Contas a vencer\")",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(checked = paid, onCheckedChange = { paid = it })
+            }
+
             Box {
                 OutlinedTextField(
                     value = LocalDate.ofEpochDay(epochDay).format(DATE_FORMAT),
@@ -199,6 +217,7 @@ fun EditTransactionScreen(
                         val base = original ?: Transaction(type = type, amountCents = 0, description = "", category = category, epochDay = 0)
                         onSave(
                             base.copy(
+                                paid = paid,
                                 type = type,
                                 amountCents = cents,
                                 description = description.trim(),

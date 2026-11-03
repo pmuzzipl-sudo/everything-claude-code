@@ -12,11 +12,15 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+import java.time.LocalDate
+import java.time.YearMonth
 
 /** Máximo de operações por lote do Firestore é 500; fica uma margem. */
 private const val BATCH_LIMIT = 400
 
 private typealias BatchOp = (WriteBatch) -> Unit
+
+private fun today(): Long = LocalDate.now().toEpochDay()
 
 /**
  * Dados em users/{uid}/... no Firestore. O cache local do Firestore guarda tudo no aparelho: o app funciona
@@ -30,10 +34,12 @@ class CloudRepository(uid: String, private val db: FirebaseFirestore = FirebaseF
     private val fixedExpenses = user.collection("fixed_expenses")
 
     override fun transactionsBetween(fromEpochDay: Long, toEpochDay: Long): Flow<List<Transaction>> =
-        transactions.rangeQuery(fromEpochDay, toEpochDay).listen { snap ->
-            snap.documents.mapNotNull { it.toTransaction() }
-                .sortedWith(compareByDescending<Transaction> { it.epochDay }.thenByDescending { it.id })
-        }
+        transactions.rangeQuery(fromEpochDay, toEpochDay).listen { it.toTransactions() }
+
+    override fun allTransactions(): Flow<List<Transaction>> = transactions.listen { it.toTransactions() }
+
+    override suspend fun transactionsOnce(fromEpochDay: Long, toEpochDay: Long): List<Transaction> =
+        transactions.rangeQuery(fromEpochDay, toEpochDay).get().await().toTransactions()
 
     override suspend fun transaction(id: Long): Transaction? = transactions.document(id.toString()).read()?.toTransaction()
 
@@ -47,8 +53,7 @@ class CloudRepository(uid: String, private val db: FirebaseFirestore = FirebaseF
     }
 
     override suspend fun expenseTotal(category: Category, fromEpochDay: Long, toEpochDay: Long): Long =
-        transactions.rangeQuery(fromEpochDay, toEpochDay).read().documents
-            .mapNotNull { it.toTransaction() }
+        transactions.rangeQuery(fromEpochDay, toEpochDay).read().toTransactions()
             .filter { it.type == TransactionType.EXPENSE && it.category == category }
             .sumOf { it.amountCents }
 
@@ -72,23 +77,46 @@ class CloudRepository(uid: String, private val db: FirebaseFirestore = FirebaseF
     override suspend fun fixedExpense(id: Long): FixedExpense? = fixedExpenses.document(id.toString()).read()?.toFixedExpense()
 
     override suspend fun saveFixedExpense(fixed: FixedExpense) {
-        val saved = if (fixed.id == 0L) fixed.copy(id = newCloudId()) else fixed
+        val horizon = generationHorizon(YearMonth.now())
+        val withId = if (fixed.id == 0L) fixed.copy(id = newCloudId()) else fixed
+        val saved = withId.copy(generatedUntilEpochMonth = if (withId.isEndless) horizon.toEpochMonth() else null)
         val old = installmentsOf(saved.id)
+        val previousPaid = old.mapNotNull { it.toTransaction() }
+            .filter { it.installment != null }
+            .associate { it.installment!! to it.paid }
+        val generated = saved.generateInstallments(until = horizon, todayEpochDay = today(), previousPaid = previousPaid)
+        val keep = generated.map { it.id.toString() }.toSet()
         commitInBatches(buildList<BatchOp> {
-            old.forEach { ref -> add { b -> b.delete(ref) } }
+            // Parcelas que deixaram de existir (ex.: menos parcelas) ou com ids de versões antigas.
+            old.filter { it.id !in keep }.forEach { doc -> add { b -> b.delete(doc.reference) } }
             add { b -> b.set(fixedExpenses.document(saved.id.toString()), saved.toCloud()) }
-            saved.toInstallments().forEach { t ->
-                val withId = t.copy(id = newCloudId())
-                add { b -> b.set(transactions.document(withId.id.toString()), withId.toCloud()) }
-            }
+            generated.forEach { t -> add { b -> b.set(transactions.document(t.id.toString()), t.toCloud()) } }
         })
     }
 
     override suspend fun deleteFixedExpense(fixed: FixedExpense) {
-        val old = installmentsOf(fixed.id)
+        val unpaid = installmentsOf(fixed.id).filter { it.toTransaction()?.paid != true }
         commitInBatches(buildList<BatchOp> {
-            old.forEach { ref -> add { b -> b.delete(ref) } }
+            unpaid.forEach { doc -> add { b -> b.delete(doc.reference) } }
             add { b -> b.delete(fixedExpenses.document(fixed.id.toString())) }
+        })
+    }
+
+    override fun extendRecurring(fixed: FixedExpense) {
+        if (!fixed.isEndless) return
+        val horizon = generationHorizon(YearMonth.now())
+        val generatedUntil = fixed.generatedUntilEpochMonth ?: (fixed.startEpochMonth - 1)
+        if (generatedUntil >= horizon.toEpochMonth()) return
+        // Ids fixos por parcela: se os dois aparelhos estenderem ao mesmo tempo, gravam os mesmos documentos.
+        val next = fixed.generateInstallments(
+            until = horizon,
+            todayEpochDay = today(),
+            fromNumber = generatedUntil - fixed.startEpochMonth + 2,
+        )
+        val updated = fixed.copy(generatedUntilEpochMonth = horizon.toEpochMonth())
+        commitInBatches(buildList<BatchOp> {
+            next.forEach { t -> add { b -> b.set(transactions.document(t.id.toString()), t.toCloud()) } }
+            add { b -> b.set(fixedExpenses.document(fixed.id.toString()), updated.toCloud()) }
         })
     }
 
@@ -101,11 +129,11 @@ class CloudRepository(uid: String, private val db: FirebaseFirestore = FirebaseF
     }
 
     /**
-     * Parcelas de uma despesa fixa. Consulta o servidor (com cache como alternativa offline), pois parcelas
-     * de meses futuros podem não estar no cache local e precisam ser apagadas ao editar.
+     * Lançamentos de uma fixa. Consulta o servidor (com cache como alternativa offline), pois parcelas de
+     * meses futuros podem não estar no cache local.
      */
-    private suspend fun installmentsOf(fixedExpenseId: Long): List<DocumentReference> =
-        transactions.whereEqualTo("fixedExpenseId", fixedExpenseId).get().await().documents.map { it.reference }
+    private suspend fun installmentsOf(fixedExpenseId: Long): List<DocumentSnapshot> =
+        transactions.whereEqualTo("fixedExpenseId", fixedExpenseId).get().await().documents
 
     private fun commitInBatches(operations: List<BatchOp>) {
         operations.chunked(BATCH_LIMIT).forEach { chunk ->
@@ -118,8 +146,12 @@ class CloudRepository(uid: String, private val db: FirebaseFirestore = FirebaseF
     private fun CollectionReference.rangeQuery(from: Long, to: Long): Query =
         whereGreaterThanOrEqualTo("epochDay", from).whereLessThanOrEqualTo("epochDay", to)
 
+    private fun QuerySnapshot.toTransactions(): List<Transaction> =
+        documents.mapNotNull { it.toTransaction() }
+            .sortedWith(compareByDescending<Transaction> { it.epochDay }.thenByDescending { it.id })
+
     private fun DocumentSnapshot.toTransaction(): Transaction? =
-        id.toLongOrNull()?.let { id -> data?.let { transactionFromCloud(id, it) } }
+        id.toLongOrNull()?.let { id -> data?.let { transactionFromCloud(id, it, today()) } }
 
     private fun DocumentSnapshot.toFixedExpense(): FixedExpense? =
         id.toLongOrNull()?.let { id -> data?.let { fixedExpenseFromCloud(id, it) } }

@@ -4,13 +4,13 @@ import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
-/**
- * Valores em centavos para evitar erros de arredondamento. Data em epoch day (LocalDate).
- * Parcelas de despesas fixas guardam a despesa de origem e o número da parcela; lançamentos avulsos
- * (despesas variáveis e receitas) deixam esses campos nulos.
+/*
+ * Tabelas do banco local (Room) das versões 1.x, anteriores à sincronização. Hoje servem só para
+ * enviar esses dados antigos para a nuvem; os campos não podem mudar sem uma nova migração.
  */
+
 @Entity(tableName = "transactions", indices = [Index("epochDay")])
-data class Transaction(
+data class LocalTransaction(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val type: TransactionType,
     val amountCents: Long,
@@ -20,23 +20,17 @@ data class Transaction(
     val fixedExpenseId: Long? = null,
     val installment: Int? = null,
     val installmentCount: Int? = null,
-) {
-    val isFixed get() = fixedExpenseId != null
-}
+)
 
-/** Limite mensal de gastos para uma categoria de despesa. */
+/** Limite mensal de gastos para uma categoria de despesa (mesmo formato no banco local e na nuvem). */
 @Entity(tableName = "budgets")
 data class Budget(
     @PrimaryKey val category: Category,
     val limitCents: Long,
 )
 
-/**
- * Despesa fixa cadastrada: o valor total é dividido em [installments] parcelas mensais a partir de
- * [startEpochMonth] (ano * 12 + mês - 1), lançadas no dia [dayOfMonth] de cada mês.
- */
 @Entity(tableName = "fixed_expenses")
-data class FixedExpense(
+data class LocalFixedExpense(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val description: String,
     val category: Category,

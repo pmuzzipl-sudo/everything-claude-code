@@ -11,16 +11,16 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface FinanceDao {
     @Query("SELECT * FROM transactions WHERE epochDay BETWEEN :from AND :to ORDER BY epochDay DESC, id DESC")
-    fun transactionsBetween(from: Long, to: Long): Flow<List<Transaction>>
+    fun transactionsBetween(from: Long, to: Long): Flow<List<LocalTransaction>>
 
     @Query("SELECT * FROM transactions WHERE id = :id")
-    suspend fun transaction(id: Long): Transaction?
+    suspend fun transaction(id: Long): LocalTransaction?
 
     @Upsert
-    suspend fun upsert(transaction: Transaction)
+    suspend fun upsert(transaction: LocalTransaction)
 
     @Delete
-    suspend fun delete(transaction: Transaction)
+    suspend fun delete(transaction: LocalTransaction)
 
     @Query(
         "SELECT COALESCE(SUM(amountCents), 0) FROM transactions " +
@@ -41,33 +41,33 @@ interface FinanceDao {
     suspend fun deleteBudget(category: Category)
 
     @Query("SELECT * FROM fixed_expenses ORDER BY startEpochMonth DESC, id DESC")
-    fun fixedExpenses(): Flow<List<FixedExpense>>
+    fun fixedExpenses(): Flow<List<LocalFixedExpense>>
 
     @Query("SELECT * FROM fixed_expenses WHERE id = :id")
-    suspend fun fixedExpense(id: Long): FixedExpense?
+    suspend fun fixedExpense(id: Long): LocalFixedExpense?
 
     @Insert
-    suspend fun insert(fixedExpense: FixedExpense): Long
+    suspend fun insert(fixedExpense: LocalFixedExpense): Long
 
     @Update
-    suspend fun update(fixedExpense: FixedExpense)
+    suspend fun update(fixedExpense: LocalFixedExpense)
 
     @Query("DELETE FROM fixed_expenses WHERE id = :id")
     suspend fun deleteFixedExpense(id: Long)
 
     @Insert
-    suspend fun insertAll(transactions: List<Transaction>)
+    suspend fun insertAll(transactions: List<LocalTransaction>)
 
     @Query("DELETE FROM transactions WHERE fixedExpenseId = :fixedExpenseId")
     suspend fun deleteInstallments(fixedExpenseId: Long)
 
     // Leitura completa usada só para enviar os dados antigos (anteriores à sincronização) para a nuvem.
     @Query("SELECT * FROM transactions")
-    suspend fun allTransactions(): List<Transaction>
+    suspend fun allTransactions(): List<LocalTransaction>
 
     @Query("SELECT * FROM budgets")
     suspend fun allBudgets(): List<Budget>
 
     @Query("SELECT * FROM fixed_expenses")
-    suspend fun allFixedExpenses(): List<FixedExpense>
+    suspend fun allFixedExpenses(): List<LocalFixedExpense>
 }

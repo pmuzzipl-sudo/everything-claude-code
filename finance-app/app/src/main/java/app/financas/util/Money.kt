@@ -43,3 +43,6 @@ fun YearMonth.shortLabel(): String =
 fun YearMonth.compactLabel(): String = "${shortLabel()}/${year % 100}"
 
 val DATE_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy", PT_BR)
+
+/** "05/11" */
+val SHORT_DATE_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM", PT_BR)

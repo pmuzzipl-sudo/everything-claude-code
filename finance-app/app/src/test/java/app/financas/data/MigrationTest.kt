@@ -71,12 +71,20 @@ class MigrationTest {
 
         // As novas tabelas e colunas funcionam após a migração.
         val id = dao.insert(
-            FixedExpense(
+            LocalFixedExpense(
                 description = "Aluguel", category = Category.HOUSING, totalCents = 300000,
                 installments = 2, startEpochMonth = 2026 * 12, dayOfMonth = 5,
             )
         )
-        dao.insertAll(dao.fixedExpense(id)!!.toInstallments())
+        dao.insertAll(
+            (1..2).map { n ->
+                LocalTransaction(
+                    type = TransactionType.EXPENSE, amountCents = 150000, description = "Aluguel",
+                    category = Category.HOUSING, epochDay = 20000L + n, fixedExpenseId = id,
+                    installment = n, installmentCount = 2,
+                )
+            },
+        )
         assertEquals(3, dao.transactionsBetween(0, 100000).first().size)
         dao.deleteInstallments(id)
         assertEquals(1, dao.transactionsBetween(0, 100000).first().size)

@@ -1,5 +1,10 @@
 package app.financas.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -16,19 +21,30 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import app.financas.data.AppSettings
 import app.financas.data.CloudRepository
 import app.financas.data.FinanceRepository
 import app.financas.data.LegacyData
 import app.financas.data.LegacySnapshot
+import app.financas.reminders.DueBillsWorker
+import app.financas.security.AppLock
+import app.financas.security.LockScreen
 import app.financas.ui.auth.LoginScreen
 import app.financas.ui.auth.userFlow
+import androidx.core.content.ContextCompat
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** Sem login mostra a tela de entrada; com login, o app com os dados da conta. */
+/** Bloqueio (se ativado) → login → app com os dados da conta. */
 @Composable
 fun AppRoot() {
+    val context = LocalContext.current
+    val settings = remember { AppSettings(context) }
+    if (settings.lockEnabled && !AppLock.unlocked) {
+        LockScreen()
+        return
+    }
     val auth = remember { FirebaseAuth.getInstance() }
     val user by remember { auth.userFlow() }.collectAsStateWithLifecycle(initialValue = auth.currentUser)
     val current = user
@@ -44,6 +60,7 @@ fun AppRoot() {
         )
         FinanceApp(vm = vm, accountEmail = current.email, onSignOut = { auth.signOut() })
         LegacyImportDialog(repo)
+        RemindersSetup(settings)
     }
 }
 
@@ -90,4 +107,21 @@ private fun LegacyImportDialog(repo: FinanceRepository) {
             }) { Text("Não enviar") }
         },
     )
+}
+
+/** Agenda o lembrete diário e, na primeira vez, pede permissão de notificação (Android 13+). */
+@Composable
+private fun RemindersSetup(settings: AppSettings) {
+    val context = LocalContext.current
+    val askPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    LaunchedEffect(Unit) {
+        if (!settings.remindersEnabled) return@LaunchedEffect
+        DueBillsWorker.schedule(context)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !settings.askedNotificationPermission &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            settings.askedNotificationPermission = true
+            askPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
 }

@@ -1,6 +1,7 @@
 package app.financas.data
 
 import android.content.Context
+import java.time.LocalDate
 import kotlin.random.Random
 
 /**
@@ -14,7 +15,9 @@ class LegacyData(private val context: Context) {
 
     suspend fun load(): LegacySnapshot {
         val dao = FinanceDatabase.get(context).dao()
-        return LegacySnapshot(dao.allTransactions(), dao.allBudgets(), dao.allFixedExpenses())
+        return LegacySnapshot.fromLocal(
+            dao.allTransactions(), dao.allBudgets(), dao.allFixedExpenses(), LocalDate.now().toEpochDay(),
+        )
     }
 
     /** Sal fixo por aparelho, para que reenviar gere os mesmos ids e não duplique nada. */

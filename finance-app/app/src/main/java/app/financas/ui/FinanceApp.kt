@@ -36,6 +36,8 @@ import app.financas.ui.screens.EditFixedExpenseScreen
 import app.financas.ui.screens.EditTransactionScreen
 import app.financas.ui.screens.FixedExpensesScreen
 import app.financas.ui.screens.HomeScreen
+import app.financas.ui.screens.SearchScreen
+import app.financas.ui.screens.SettingsScreen
 
 private enum class Tab(val route: String, val label: String, val icon: ImageVector) {
     HOME("home", "Início", Icons.Filled.AccountBalanceWallet),
@@ -46,6 +48,8 @@ private enum class Tab(val route: String, val label: String, val icon: ImageVect
 
 private const val EDIT_ROUTE = "edit?id={id}"
 private const val CATEGORY_ROUTE = "category/{category}"
+private const val SEARCH_ROUTE = "search"
+private const val SETTINGS_ROUTE = "settings"
 private const val EDIT_FIXED_ROUTE = "fixed/edit?id={id}"
 private fun editFixedRoute(id: Long?) = if (id == null) "fixed/edit" else "fixed/edit?id=$id"
 private fun editRoute(id: Long?) = if (id == null) "edit" else "edit?id=$id"
@@ -93,9 +97,22 @@ fun FinanceApp(vm: FinanceViewModel, accountEmail: String?, onSignOut: () -> Uni
                     onNextMonth = vm::nextMonth,
                     onAdd = { nav.navigate(editRoute(null)) },
                     onOpen = { nav.navigate(editRoute(it.id)) },
-                    accountEmail = accountEmail,
-                    onSignOut = onSignOut,
+                    onTogglePaid = vm::togglePaid,
+                    onSearch = { nav.navigate(SEARCH_ROUTE) },
+                    onSettings = { nav.navigate(SETTINGS_ROUTE) },
                 )
+            }
+            composable(SEARCH_ROUTE) {
+                val all = remember { vm.allTransactions() }
+                SearchScreen(
+                    transactions = all,
+                    onOpen = { nav.navigate(editRoute(it.id)) },
+                    onTogglePaid = vm::togglePaid,
+                    onBack = { nav.popBackStack() },
+                )
+            }
+            composable(SETTINGS_ROUTE) {
+                SettingsScreen(accountEmail = accountEmail, onSignOut = onSignOut, onBack = { nav.popBackStack() })
             }
             composable(Tab.CHARTS.route) {
                 ChartsScreen(

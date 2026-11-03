@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [Transaction::class, Budget::class, FixedExpense::class], version = 2, exportSchema = false)
+@Database(entities = [LocalTransaction::class, Budget::class, LocalFixedExpense::class], version = 2, exportSchema = false)
 abstract class FinanceDatabase : RoomDatabase() {
     abstract fun dao(): FinanceDao
 

@@ -8,8 +8,15 @@ no próprio celular.
 - **Receitas e despesas**: lançamentos com valor, descrição, categoria e data. Toque em um item para editar ou excluir.
 - **Saldo mensal**: resumo do mês com receitas, despesas (fixas e variáveis) e saldo; navegue entre os meses.
   Os lançamentos do mês ficam separados nas abas **Variáveis**, **Fixas** e **Receitas**.
-- **Despesas fixas**: na aba **Fixas**, cadastre uma despesa com valor total, número de parcelas, mês de início e dia
-  do vencimento. O app divide o valor e lança cada parcela automaticamente no mês correspondente.
+- **Fixas e recorrentes**: na aba **Fixas**, cadastre despesas e receitas que se repetem: valor mensal (com ou sem
+  data de fim) ou valor total parcelado. O app lança cada mês automaticamente e mostra o quanto os próximos 6 meses
+  já estão comprometidos.
+- **Pago/recebido e contas a vencer**: marque cada lançamento como pago (ou recebido). A tela inicial mostra o saldo
+  previsto para o fim do mês, o realizado até agora e as contas atrasadas ou que vencem nos próximos 7 dias, com
+  lembrete diário por notificação.
+- **Busca**: encontre lançamentos por descrição ou categoria, tipo, valor e período.
+- **Bloqueio**: opcionalmente, o app pede a digital ou o PIN do aparelho para abrir.
+- **Sincronização**: os dados ficam na conta Google do usuário (Firebase) e aparecem em todos os aparelhos.
 - **Gráficos**: gráfico de rosca com despesas ou receitas por categoria e gráfico de barras dos últimos 6 meses.
   Toque em uma categoria para ver os lançamentos dela, agrupados por descrições parecidas.
 - **Comparativo**: na aba Comparativo dos gráficos, compare as despesas de cada categoria mês a mês, com filtros de

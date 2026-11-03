@@ -26,9 +26,21 @@ import java.time.YearMonth
 /** Percentual do orçamento a partir do qual o usuário é avisado. */
 const val BUDGET_WARNING_RATIO = 0.8
 
-data class MonthSummary(val incomeCents: Long = 0, val fixedCents: Long = 0, val variableCents: Long = 0) {
+data class MonthSummary(
+    val incomeCents: Long = 0,
+    val fixedCents: Long = 0,
+    val variableCents: Long = 0,
+    /** Receitas já recebidas e despesas já pagas. */
+    val receivedCents: Long = 0,
+    val paidCents: Long = 0,
+) {
     val expenseCents get() = fixedCents + variableCents
+    /** Saldo previsto para o fim do mês, contando tudo o que está lançado. */
     val balanceCents get() = incomeCents - expenseCents
+    /** Saldo realizado até agora: só o que já foi recebido ou pago. */
+    val realizedCents get() = receivedCents - paidCents
+    val toReceiveCents get() = incomeCents - receivedCents
+    val toPayCents get() = expenseCents - paidCents
 }
 
 data class MonthTotals(val month: YearMonth, val incomeCents: Long, val expenseCents: Long)
@@ -50,6 +62,9 @@ data class FinanceUiState(
     val recentTransactions: List<Transaction> = emptyList(),
     val budgets: List<BudgetStatus> = emptyList(),
     val fixedExpenses: List<FixedExpense> = emptyList(),
+    /** Despesas não pagas, atrasadas ou vencendo nos próximos dias (independe do mês selecionado). */
+    val dueBills: List<Transaction> = emptyList(),
+    val todayEpochDay: Long = LocalDate.now().toEpochDay(),
 )
 
 private const val HISTORY_MONTHS = 6L
@@ -77,10 +92,30 @@ class FinanceViewModel(private val repo: FinanceRepository) : ViewModel() {
         repo.transactionsBetween(m.minusMonths(LOADED_MONTHS - 1L).firstDay(), m.lastDay())
     }
 
+    private val today = LocalDate.now().toEpochDay()
+
+    private val dueWindow = repo.transactionsBetween(today - DUE_LOOKBACK_DAYS, today + DUE_AHEAD_DAYS)
+
     val state: StateFlow<FinanceUiState> =
-        combine(month, recentTransactions, repo.budgets(), repo.fixedExpenses()) { m, recent, budgets, fixed ->
-            buildState(m, recent, budgets).copy(fixedExpenses = fixed)
+        combine(month, recentTransactions, repo.budgets(), repo.fixedExpenses(), dueWindow) { m, recent, budgets, fixed, due ->
+            buildState(m, recent, budgets).copy(
+                fixedExpenses = fixed,
+                dueBills = dueBills(due, today),
+                todayEpochDay = today,
+            )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), FinanceUiState())
+
+    init {
+        // Recorrências sem data de fim: mantém os próximos meses sempre lançados.
+        viewModelScope.launch {
+            repo.fixedExpenses().collect { list -> list.forEach { runCatching { repo.extendRecurring(it) } } }
+        }
+    }
+
+    /** Todos os lançamentos, para a busca. */
+    fun allTransactions() = repo.allTransactions()
+
+    fun togglePaid(transaction: Transaction) = repo.save(transaction.copy(paid = !transaction.paid))
 
     fun previousMonth() = month.update { it.minusMonths(1) }
     fun nextMonth() = month.update { it.plusMonths(1) }
@@ -130,6 +165,7 @@ class FinanceViewModel(private val repo: FinanceRepository) : ViewModel() {
     private fun buildState(m: YearMonth, recent: List<Transaction>, budgets: List<Budget>): FinanceUiState {
         val current = recent.filter { it.month() == m }
         val expenses = current.filter { it.type == TransactionType.EXPENSE }
+        val incomes = current.filter { it.type == TransactionType.INCOME }
         val spentByCategory = expenses.totalsByCategory()
         val limits = budgets.associate { it.category to it.limitCents }
 
@@ -147,13 +183,14 @@ class FinanceViewModel(private val repo: FinanceRepository) : ViewModel() {
             month = m,
             transactions = current,
             summary = MonthSummary(
-                incomeCents = current.filter { it.type == TransactionType.INCOME }.sumOf { it.amountCents },
+                incomeCents = incomes.sumOf { it.amountCents },
                 fixedCents = expenses.filter { it.isFixed }.sumOf { it.amountCents },
                 variableCents = expenses.filterNot { it.isFixed }.sumOf { it.amountCents },
+                receivedCents = incomes.filter { it.paid }.sumOf { it.amountCents },
+                paidCents = expenses.filter { it.paid }.sumOf { it.amountCents },
             ),
             expensesByCategory = spentByCategory.toList().sortedByDescending { it.second },
-            incomeByCategory = current.filter { it.type == TransactionType.INCOME }
-                .totalsByCategory().toList().sortedByDescending { it.second },
+            incomeByCategory = incomes.totalsByCategory().toList().sortedByDescending { it.second },
             history = history,
             recentTransactions = recent,
             budgets = Category.of(TransactionType.EXPENSE).map { c ->

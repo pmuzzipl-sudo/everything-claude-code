@@ -1,6 +1,5 @@
 package app.financas.ui.screens
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,17 +14,18 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.EventBusy
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -34,12 +34,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -47,12 +45,14 @@ import androidx.compose.ui.unit.dp
 import app.financas.data.Transaction
 import app.financas.data.TransactionType
 import app.financas.ui.FinanceUiState
+import app.financas.ui.dueLabel
 import app.financas.ui.theme.ExpenseColor
 import app.financas.ui.theme.IncomeColor
 import app.financas.ui.theme.WarningColor
-import app.financas.util.DATE_FORMAT
 import app.financas.util.formatMoney
-import java.time.LocalDate
+import java.time.YearMonth
+
+private const val DUE_SHOWN = 5
 
 private enum class HomeTab(val label: String, val filter: (Transaction) -> Boolean) {
     VARIABLE("Variáveis", { it.type == TransactionType.EXPENSE && !it.isFixed }),
@@ -67,17 +67,37 @@ fun HomeScreen(
     onNextMonth: () -> Unit,
     onAdd: () -> Unit,
     onOpen: (Transaction) -> Unit,
-    accountEmail: String?,
-    onSignOut: () -> Unit,
+    onTogglePaid: (Transaction) -> Unit,
+    onSearch: () -> Unit,
+    onSettings: () -> Unit,
 ) {
-    var confirmSignOut by remember { mutableStateOf(false) }
     val alerts = state.budgets.filter { it.isOver || it.isNear }
     var tab by rememberSaveable { mutableStateOf(HomeTab.VARIABLE) }
+    var showAllDue by rememberSaveable { mutableStateOf(false) }
     val shown = state.transactions.filter(tab.filter)
     Box(Modifier.fillMaxSize()) {
         LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 88.dp)) {
+            item {
+                Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Minhas Finanças", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                    IconButton(onClick = onSearch) { Icon(Icons.Filled.Search, contentDescription = "Buscar") }
+                    IconButton(onClick = onSettings) { Icon(Icons.Filled.Settings, contentDescription = "Configurações") }
+                }
+            }
             item { MonthSelector(state.month, onPreviousMonth, onNextMonth) }
             item { SummaryCard(state) }
+            if (state.dueBills.isNotEmpty()) {
+                item {
+                    DueBillsCard(
+                        bills = if (showAllDue) state.dueBills else state.dueBills.take(DUE_SHOWN),
+                        hidden = if (showAllDue) 0 else (state.dueBills.size - DUE_SHOWN).coerceAtLeast(0),
+                        todayEpochDay = state.todayEpochDay,
+                        onShowAll = { showAllDue = true },
+                        onOpen = onOpen,
+                        onTogglePaid = onTogglePaid,
+                    )
+                }
+            }
             if (alerts.isNotEmpty()) {
                 item {
                     Card(
@@ -109,11 +129,7 @@ fun HomeScreen(
             item {
                 TabRow(selectedTabIndex = tab.ordinal, modifier = Modifier.padding(top = 16.dp)) {
                     HomeTab.entries.forEach { t ->
-                        Tab(
-                            selected = tab == t,
-                            onClick = { tab = t },
-                            text = { Text(t.label, maxLines = 1) },
-                        )
+                        Tab(selected = tab == t, onClick = { tab = t }, text = { Text(t.label, maxLines = 1) })
                     }
                 }
                 Row(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
@@ -145,27 +161,8 @@ fun HomeScreen(
                 }
             }
             items(shown, key = { it.id }) { t ->
-                TransactionRow(t, onClick = { onOpen(t) })
+                TransactionRow(t, onClick = { onOpen(t) }, onTogglePaid = { onTogglePaid(t) })
                 HorizontalDivider()
-            }
-            item {
-                Row(Modifier.fillMaxWidth().padding(top = 24.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Filled.CloudDone,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp),
-                    )
-                    Text(
-                        "Sincronizado com ${accountEmail ?: "sua conta"}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f).padding(start = 6.dp),
-                    )
-                    TextButton(onClick = { confirmSignOut = true }) { Text("Sair") }
-                }
             }
         }
         ExtendedFloatingActionButton(
@@ -175,34 +172,44 @@ fun HomeScreen(
             modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
         )
     }
-    if (confirmSignOut) {
-        AlertDialog(
-            onDismissRequest = { confirmSignOut = false },
-            title = { Text("Sair da conta?") },
-            text = { Text("Seus dados continuam salvos na nuvem. Entre de novo com a mesma conta para vê-los.") },
-            confirmButton = {
-                TextButton(onClick = { confirmSignOut = false; onSignOut() }) { Text("Sair") }
-            },
-            dismissButton = { TextButton(onClick = { confirmSignOut = false }) { Text("Cancelar") } },
-        )
-    }
 }
 
 @Composable
 private fun SummaryCard(state: FinanceUiState) {
     val s = state.summary
+    val now = YearMonth.now()
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
     ) {
         Column(Modifier.padding(16.dp)) {
-            Text("Saldo do mês", style = MaterialTheme.typography.labelLarge)
+            Text(
+                when {
+                    state.month < now -> "Saldo do mês"
+                    else -> "Saldo previsto no fim do mês"
+                },
+                style = MaterialTheme.typography.labelLarge,
+            )
             Text(
                 formatMoney(s.balanceCents),
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 color = if (s.balanceCents < 0) ExpenseColor else MaterialTheme.colorScheme.onPrimaryContainer,
             )
+            if (state.month >= now && (s.toPayCents > 0 || s.toReceiveCents > 0)) {
+                Text(
+                    "Realizado até agora: ${formatMoney(s.realizedCents)}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (s.realizedCents < 0) ExpenseColor else MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+                Text(
+                    buildList {
+                        if (s.toReceiveCents > 0) add("a receber ${formatMoney(s.toReceiveCents)}")
+                        if (s.toPayCents > 0) add("a pagar ${formatMoney(s.toPayCents)}")
+                    }.joinToString(" • ").replaceFirstChar { it.uppercase() },
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
             Spacer(Modifier.size(12.dp))
             Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                 Column {
@@ -212,14 +219,8 @@ private fun SummaryCard(state: FinanceUiState) {
                 Column(horizontalAlignment = Alignment.End) {
                     Text("Despesas", style = MaterialTheme.typography.labelMedium)
                     Text(formatMoney(s.expenseCents), color = ExpenseColor, fontWeight = FontWeight.SemiBold)
-                    Text(
-                        "Fixas ${formatMoney(s.fixedCents)}",
-                        style = MaterialTheme.typography.labelSmall,
-                    )
-                    Text(
-                        "Variáveis ${formatMoney(s.variableCents)}",
-                        style = MaterialTheme.typography.labelSmall,
-                    )
+                    Text("Fixas ${formatMoney(s.fixedCents)}", style = MaterialTheme.typography.labelSmall)
+                    Text("Variáveis ${formatMoney(s.variableCents)}", style = MaterialTheme.typography.labelSmall)
                 }
             }
         }
@@ -227,35 +228,52 @@ private fun SummaryCard(state: FinanceUiState) {
 }
 
 @Composable
-private fun TransactionRow(t: Transaction, onClick: () -> Unit) {
-    val income = t.type == TransactionType.INCOME
-    Row(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(Modifier.size(12.dp).background(Color(t.category.color), CircleShape))
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                t.description.ifBlank { t.category.label },
-                style = MaterialTheme.typography.bodyLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                buildString {
-                    append(t.category.label)
-                    if (t.installment != null) append(" • parcela ${t.installment}/${t.installmentCount}")
-                    append(" • ${LocalDate.ofEpochDay(t.epochDay).format(DATE_FORMAT)}")
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+private fun DueBillsCard(
+    bills: List<Transaction>,
+    hidden: Int,
+    todayEpochDay: Long,
+    onShowAll: () -> Unit,
+    onOpen: (Transaction) -> Unit,
+    onTogglePaid: (Transaction) -> Unit,
+) {
+    Card(Modifier.fillMaxWidth().padding(top = 12.dp)) {
+        Column(Modifier.padding(start = 12.dp, end = 4.dp, top = 12.dp, bottom = 4.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.EventBusy, contentDescription = null, tint = WarningColor, modifier = Modifier.size(18.dp))
+                Text(
+                    "Contas a vencer",
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.padding(start = 8.dp).weight(1f),
+                )
+                Text(
+                    formatMoney(bills.sumOf { it.amountCents }),
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.padding(end = 8.dp),
+                )
+            }
+            bills.forEach { t ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f).padding(vertical = 6.dp)) {
+                        Text(
+                            t.description.ifBlank { t.category.label },
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.clickable { onOpen(t) },
+                        )
+                        Text(
+                            dueLabel(t.epochDay, todayEpochDay),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (t.epochDay < todayEpochDay) ExpenseColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Text(formatMoney(t.amountCents), style = MaterialTheme.typography.bodyMedium)
+                    PaidButton(t, onToggle = { onTogglePaid(t) })
+                }
+            }
+            if (hidden > 0) {
+                TextButton(onClick = onShowAll) { Text("Ver mais $hidden") }
+            }
         }
-        Text(
-            (if (income) "+ " else "- ") + formatMoney(t.amountCents),
-            color = if (income) IncomeColor else ExpenseColor,
-            fontWeight = FontWeight.SemiBold,
-        )
     }
 }

@@ -16,8 +16,8 @@ android {
         applicationId = "app.financas"
         minSdk = 26
         targetSdk = 34
-        versionCode = 7
-        versionName = "2.1"
+        versionCode = 8
+        versionName = "3.0"
     }
 
     // Chave fixa: toda versão precisa da mesma assinatura para atualizar o app sem desinstalar.
@@ -78,6 +78,11 @@ dependencies {
     implementation("androidx.credentials:credentials:1.3.0")
     implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
     implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
+
+    // Bloqueio com digital/PIN e lembrete diário de contas.
+    implementation("androidx.appcompat:appcompat:1.7.0")
+    implementation("androidx.biometric:biometric:1.1.0")
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
 
     // Banco local das versões anteriores, usado só para enviar os dados antigos para a nuvem.
     implementation("androidx.room:room-runtime:2.6.1")
