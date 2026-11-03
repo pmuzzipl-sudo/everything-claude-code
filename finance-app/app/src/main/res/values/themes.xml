@@ -1,3 +1,8 @@
 <resources>
-    <style name="Theme.MinhasFinancas" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- Escuro desde a abertura, sem flash branco; barras do sistema na mesma cor do app. -->
+    <style name="Theme.MinhasFinancas" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/app_background</item>
+        <item name="android:statusBarColor">@color/app_background</item>
+        <item name="android:navigationBarColor">@color/app_bars</item>
+    </style>
 </resources>
