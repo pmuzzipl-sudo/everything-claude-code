@@ -25,24 +25,28 @@ data class TargetRow(
 }
 
 /**
- * [totalCents] é a base das metas: só os ativos não congelados. Os congelados ficam em [frozen], somando no
- * patrimônio mas fora das porcentagens.
+ * [totalCents] é a base das metas: o valor total da carteira, incluindo os congelados. Os congelados ficam em
+ * [frozen]: ocupam parte do total, mas não têm meta nem recebem aportes.
  */
 data class TargetsSummary(val rows: List<TargetRow>, val totalCents: Long, val frozen: List<Holding> = emptyList()) {
     val frozenCents: Long get() = frozen.sumOf { it.valueCents }
+    /** Participação atual dos congelados no total, em pontos-base. */
+    val frozenBps: Int get() = if (totalCents == 0L) 0 else (frozenCents * FULL_BPS / totalCents).toInt()
+    /** Metas passam de 100% do total. */
+    val isOverAllocated get() = targetSumBps > FULL_BPS
     val targetSumBps: Int get() = rows.sumOf { row -> row.targetRatio?.let { (it * FULL_BPS).roundToLong().toInt() } ?: 0 }
     val hasTargets get() = rows.any { it.targetRatio != null }
     val isComplete get() = targetSumBps == FULL_BPS
 }
 
 /**
- * Participação atual de cada ativo e a meta, sobre o total dos ativos não congelados. Inclui ativos em
- * carteira e ativos com meta ainda sem cotas (para mostrar que falta comprar). Ordenado do mais abaixo da
- * meta para o mais acima. Metas de ativos congelados são ignoradas.
+ * Participação atual de cada ativo e a meta, sobre o valor total da carteira (congelados incluídos). Inclui
+ * ativos em carteira e ativos com meta ainda sem cotas (para mostrar que falta comprar). Ordenado do mais
+ * abaixo da meta para o mais acima. Congelados não aparecem nas linhas e suas metas são ignoradas.
  */
 fun targetsSummary(portfolio: PortfolioSummary): TargetsSummary {
     val (frozen, active) = portfolio.holdings.partition { it.asset.frozen }
-    val total = active.sumOf { it.valueCents }
+    val total = portfolio.valueCents
     val candidates = active + portfolio.closed.filter { it.asset.targetBps != null && !it.asset.frozen }
     val rows = candidates.map { h ->
         TargetRow(

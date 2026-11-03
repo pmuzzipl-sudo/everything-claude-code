@@ -75,27 +75,28 @@ class TargetsTest {
     }
 
     @Test
-    fun frozenAssetCountsInTotalButNotInTargets() {
-        // IVVB11 congelado (R$ 5.000): base das metas = IMAB11 R$ 3.000 + HASH11 R$ 2.000 = R$ 5.000.
+    fun frozenAssetHasNoTargetButCountsInTheBase() {
+        // IVVB11 congelado (R$ 5.000 = 50% de R$ 10.000). Base das metas = carteira inteira.
         val assets = listOf(
             Asset("IVVB11", AssetClass.EQUITY, targetBps = 5000, frozen = true),
-            Asset("IMAB11", AssetClass.FIXED_INCOME, targetBps = 5000),
-            Asset("HASH11", AssetClass.CRYPTO, targetBps = 5000),
+            Asset("IMAB11", AssetClass.FIXED_INCOME, targetBps = 3000),
+            Asset("HASH11", AssetClass.CRYPTO, targetBps = 2000),
         )
-        val portfolio = buildPortfolio(assets, ops, quotes)
-        val s = targetsSummary(portfolio)
-        assertEquals(10_000_00, portfolio.valueCents)
-        assertEquals(5_000_00, s.totalCents)
+        val s = targetsSummary(buildPortfolio(assets, ops, quotes))
+        assertEquals(10_000_00, s.totalCents)
         assertEquals(listOf("IVVB11"), s.frozen.map { it.ticker })
         assertEquals(5_000_00, s.frozenCents)
+        assertEquals(5000, s.frozenBps)
         assertEquals(setOf("IMAB11", "HASH11"), s.rows.map { it.ticker }.toSet())
-        // Meta do congelado é ignorada: 50% + 50% = 100%.
-        assertTrue(s.isComplete)
-        assertEquals(0.6, s.rows.first { it.ticker == "IMAB11" }.currentRatio, 1e-9)
-        // Aporte de R$ 1.000 → base R$ 6.000, metas 50/50: HASH11 precisa 1.000, IMAB11 0.
-        val suggestion = suggestContribution(s, 1_000_00)
-        assertEquals(listOf("HASH11"), suggestion.map { it.ticker })
-        assertEquals(1_000_00L, suggestion.single().amountCents)
+        // Meta do congelado é ignorada: 30% + 20% (+ 50% congelado).
+        assertEquals(5000, s.targetSumBps)
+        assertFalse(s.isOverAllocated)
+        assertEquals(0.3, s.rows.first { it.ticker == "IMAB11" }.currentRatio, 1e-9)
+        assertEquals(0L, s.rows.first { it.ticker == "IMAB11" }.adjustCents(s.totalCents))
+        // Aporte de R$ 1.000 → total R$ 11.000: IMAB11 precisa 3.300 - 3.000 = 300; HASH11 2.200 - 2.000 = 200.
+        // Sobram 500 (fatia que seria do congelado), divididos 30/20 entre os ativos com meta.
+        val suggestion = suggestContribution(s, 1_000_00).associate { it.ticker to it.amountCents }
+        assertEquals(mapOf("IMAB11" to 600_00L, "HASH11" to 400_00L), suggestion)
     }
 
     @Test

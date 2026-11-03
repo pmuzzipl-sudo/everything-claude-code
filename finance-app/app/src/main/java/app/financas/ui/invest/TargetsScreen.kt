@@ -49,6 +49,7 @@ import app.financas.invest.InvestUiState
 import app.financas.invest.suggestContribution
 import app.financas.invest.targetsSummary
 import app.financas.ui.theme.ExpenseColor
+import app.financas.ui.theme.WarningColor
 import app.financas.util.formatMoney
 import app.financas.util.formatPrice
 import app.financas.util.parseDecimal
@@ -137,10 +138,16 @@ fun TargetsScreen(state: InvestUiState, onSave: (Map<String, Int?>) -> Unit, onB
             }
             item {
                 Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    val check = if (sumBps == 0) null else targetsCheck(sumBps, summary.frozenBps)
                     Text(
-                        "Total das metas: ${formatBps(sumBps)}",
+                        "Total das metas: ${formatBps(sumBps)}" +
+                            if (summary.frozen.isNotEmpty()) " + congelados ${formatBps(summary.frozenBps)}" else "",
                         fontWeight = FontWeight.SemiBold,
-                        color = if (sumBps == FULL_BPS || sumBps == 0) MaterialTheme.colorScheme.onSurface else ExpenseColor,
+                        color = when {
+                            check == null -> MaterialTheme.colorScheme.onSurface
+                            check.second -> ExpenseColor
+                            else -> WarningColor
+                        },
                         modifier = Modifier.weight(1f),
                     )
                     Button(
@@ -148,13 +155,10 @@ fun TargetsScreen(state: InvestUiState, onSave: (Map<String, Int?>) -> Unit, onB
                         enabled = changed && invalid.isEmpty(),
                     ) { Text(if (saved && !changed) "Salvo" else "Salvar metas") }
                 }
-                if (sumBps != FULL_BPS && sumBps != 0) {
-                    Text(
-                        if (sumBps < FULL_BPS) "Faltam ${formatBps(FULL_BPS - sumBps)} para 100%."
-                        else "Passou ${formatBps(sumBps - FULL_BPS)} de 100%.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = ExpenseColor,
-                    )
+                if (sumBps != 0) {
+                    targetsCheck(sumBps, summary.frozenBps)?.let { (msg, isError) ->
+                        Text(msg, style = MaterialTheme.typography.bodySmall, color = if (isError) ExpenseColor else WarningColor)
+                    }
                 }
                 HorizontalDivider(Modifier.padding(vertical = 16.dp))
                 Text("Simular aporte", style = MaterialTheme.typography.titleMedium)
@@ -217,3 +221,21 @@ fun TargetsScreen(state: InvestUiState, onSave: (Map<String, Int?>) -> Unit, onB
 /** 0.3214 -> "32,1%" */
 fun formatRatio(ratio: Double): String =
     BigDecimal(ratio * 100).setScale(1, RoundingMode.HALF_UP).toPlainString().replace('.', ',') + "%"
+
+/** Tolerância para considerar que metas + congelados fecham 100% (a fatia dos congelados oscila com o preço). */
+private const val TOLERANCE_BPS = 100
+
+/**
+ * Confere a soma das metas com a parte ocupada pelos congelados. Retorna (mensagem, é erro) ou null se ok.
+ * É erro só quando as metas sozinhas passam de 100%; o resto é aviso.
+ */
+internal fun targetsCheck(targetSumBps: Int, frozenBps: Int): Pair<String, Boolean>? {
+    val allocated = targetSumBps + frozenBps
+    val withFrozen = if (frozenBps > 0) " (com ${formatBps(frozenBps)} dos congelados)" else ""
+    return when {
+        targetSumBps > FULL_BPS -> "As metas somam ${formatBps(targetSumBps)}: passam de 100%." to true
+        allocated < FULL_BPS - TOLERANCE_BPS -> "Faltam ${formatBps(FULL_BPS - allocated)} para fechar 100%$withFrozen." to false
+        allocated > FULL_BPS + TOLERANCE_BPS -> "Passou ${formatBps(allocated - FULL_BPS)} de 100%$withFrozen." to false
+        else -> null
+    }
+}

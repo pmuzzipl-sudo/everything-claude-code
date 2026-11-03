@@ -305,8 +305,8 @@ private fun TargetsCard(state: InvestUiState, onOpenTargets: () -> Unit) {
             }
             if (summary.frozen.isNotEmpty()) {
                 Text(
-                    "❄ Congelados, fora das metas: ${summary.frozen.joinToString { it.ticker }} • ${formatMoney(summary.frozenCents)}. " +
-                        "As porcentagens abaixo são sobre ${formatMoney(summary.totalCents)}.",
+                    "❄ Congelados, sem meta: ${summary.frozen.joinToString { it.ticker }} • ${formatMoney(summary.frozenCents)} " +
+                        "(${formatBps(summary.frozenBps)} do total). As porcentagens são sobre o total da carteira.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 4.dp),
@@ -320,11 +320,11 @@ private fun TargetsCard(state: InvestUiState, onOpenTargets: () -> Unit) {
                 )
                 return@Column
             }
-            if (!summary.isComplete) {
+            targetsCheck(summary.targetSumBps, summary.frozenBps)?.let { (msg, isError) ->
                 Text(
-                    "As metas somam ${formatBps(summary.targetSumBps)} (o ideal é 100%).",
+                    msg,
                     style = MaterialTheme.typography.bodySmall,
-                    color = ExpenseColor,
+                    color = if (isError) ExpenseColor else WarningColor,
                     modifier = Modifier.padding(bottom = 4.dp),
                 )
             }
