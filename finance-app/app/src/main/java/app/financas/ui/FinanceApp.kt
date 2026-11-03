@@ -176,6 +176,7 @@ fun FinanceApp(vm: FinanceViewModel, investVm: InvestmentsViewModel, accountEmai
                     onOpenOperation = { nav.navigate(operationRoute(it.id, null)) },
                     onOpenSettings = { nav.navigate(SETTINGS_ROUTE) },
                     onOpenTargets = { nav.navigate(TARGETS_ROUTE) },
+                    onReconstructHistory = investVm::reconstructHistoryIfNeeded,
                 )
             }
             composable(TARGETS_ROUTE) {

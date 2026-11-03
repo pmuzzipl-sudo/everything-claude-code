@@ -111,8 +111,19 @@ data class Quote(
     val history: List<Pair<Long, Double>> = emptyList(),
 )
 
-/** Ponto da evolução da carteira: valor de mercado e custo investido em um dia. */
-data class PortfolioPoint(val epochDay: Long, val valueCents: Long, val investedCents: Long)
+/** Valor de mercado e custo de um ativo em um dia. */
+data class AssetPoint(val valueCents: Long, val costCents: Long)
+
+/**
+ * Ponto da evolução da carteira: valor de mercado e custo investido em um dia, no total e por ativo
+ * ([assets] fica vazio em pontos gravados pela versão 4.0-4.2).
+ */
+data class PortfolioPoint(
+    val epochDay: Long,
+    val valueCents: Long,
+    val investedCents: Long,
+    val assets: Map<String, AssetPoint> = emptyMap(),
+)
 
 /** Ticker como a B3 usa: maiúsculas, sem espaços (ex.: "ivvb11 " -> "IVVB11"). */
 fun normalizeTicker(input: String): String = input.trim().uppercase().filter { it.isLetterOrDigit() }

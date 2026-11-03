@@ -76,6 +76,15 @@ class InvestRepository(uid: String, private val db: FirebaseFirestore = Firebase
         history.document(point.epochDay.toString()).set(point.toCloud())
     }
 
+    /** Grava vários pontos de uma vez (reconstrução do histórico), em lotes. */
+    fun saveSnapshots(points: List<PortfolioPoint>) {
+        points.chunked(400).forEach { chunk ->
+            val batch = db.batch()
+            chunk.forEach { batch.set(history.document(it.epochDay.toString()), it.toCloud()) }
+            batch.commit()
+        }
+    }
+
     /** Chave do brapi.dev, guardada na conta (vale para todos os aparelhos). */
     fun brapiToken(): Flow<String?> = callbackFlow {
         val registration = quoteSettings.addSnapshotListener { snap, error ->

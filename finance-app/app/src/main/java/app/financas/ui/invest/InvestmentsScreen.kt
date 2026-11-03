@@ -30,6 +30,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
@@ -38,6 +39,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -49,17 +51,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import app.financas.invest.AssetClass
 import app.financas.invest.AssetOperation
 import app.financas.invest.Holding
 import app.financas.invest.InvestUiState
-import app.financas.invest.PortfolioPoint
 import app.financas.invest.targetsSummary
-import app.financas.ui.screens.DonutChart
-import app.financas.ui.screens.LineChart
 import app.financas.ui.theme.ExpenseColor
 import app.financas.ui.theme.IncomeColor
 import app.financas.ui.theme.WarningColor
-import app.financas.util.SHORT_DATE_FORMAT
 import app.financas.util.formatMoney
 import app.financas.util.formatPercent
 import app.financas.util.formatPrice
@@ -80,6 +79,7 @@ fun InvestmentsScreen(
     onOpenOperation: (AssetOperation) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenTargets: () -> Unit,
+    onReconstructHistory: () -> Unit,
 ) {
     val tickers = state.portfolio.holdings.map { it.ticker }
     // Ao abrir (ou ao mudar a carteira/chave), atualiza cotações que estiverem antigas.
@@ -88,17 +88,17 @@ fun InvestmentsScreen(
 
     Column(Modifier.fillMaxSize()) {
         TabRow(selectedTabIndex = tab) {
-            listOf("Carteira", "Lançamentos").forEachIndexed { i, label ->
+            listOf("Carteira", "Lançamentos", "Análise").forEachIndexed { i, label ->
                 Tab(selected = tab == i, onClick = { tab = i }, text = { Text(label) })
             }
         }
         Box(Modifier.weight(1f)) {
-            if (tab == 0) {
-                PortfolioTab(state, onRefresh, onOpenAsset, onOpenSettings, onOpenTargets)
-            } else {
-                OperationsTab(state, onOpenOperation)
+            when (tab) {
+                0 -> PortfolioTab(state, onRefresh, onOpenAsset, onOpenSettings, onOpenTargets)
+                1 -> OperationsTab(state, onOpenOperation)
+                else -> AnalysisTab(state, onReconstructHistory)
             }
-            ExtendedFloatingActionButton(
+            if (tab != 2) ExtendedFloatingActionButton(
                 onClick = onAddOperation,
                 icon = { Icon(Icons.Filled.Add, contentDescription = null) },
                 text = { Text(if (tab == 0) "Nova operação" else "Novo lançamento") },
@@ -116,6 +116,12 @@ private fun PortfolioTab(
     onOpenSettings: () -> Unit,
     onOpenTargets: () -> Unit,
 ) {
+    // Abas por classe: só as classes que existem na carteira (mais "Todos").
+    val classTabs: List<AssetClass?> = listOf<AssetClass?>(null) +
+        AssetClass.entries.filter { c -> state.portfolio.holdings.any { it.asset.assetClass == c } }
+    var selectedClass by rememberSaveable { mutableStateOf<AssetClass?>(null) }
+    val classTab = selectedClass.takeIf { it in classTabs }
+    val shown = state.portfolio.holdings.filter { classTab == null || it.asset.assetClass == classTab }
     LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp)) {
         if (!state.hasToken) {
             item {
@@ -147,11 +153,35 @@ private fun PortfolioTab(
                 )
             }
         } else {
-            item { AllocationCard(state) }
             item { TargetsCard(state, onOpenTargets) }
-            if (state.history.size >= 2) item { EvolutionCard(state.history) }
-            item { Text("Ativos", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp)) }
-            items(state.portfolio.holdings, key = { it.ticker }) { h ->
+            item {
+                ScrollableTabRow(
+                    selectedTabIndex = classTabs.indexOf(classTab).coerceAtLeast(0),
+                    edgePadding = 0.dp,
+                    modifier = Modifier.padding(top = 16.dp),
+                ) {
+                    classTabs.forEach { c ->
+                        Tab(selected = classTab == c, onClick = { selectedClass = c }, text = { Text(c?.label ?: "Todos", maxLines = 1) })
+                    }
+                }
+                Row(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                    Text(
+                        "${shown.size} ativo" + if (shown.size == 1) "" else "s",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f),
+                    )
+                    val value = shown.sumOf { it.valueCents }
+                    val cost = shown.sumOf { it.position.costCents }
+                    Text(
+                        formatMoney(value) + if (cost > 0) " (${formatPercent((value - cost).toDouble() / cost)})" else "",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = resultColor(value - cost),
+                    )
+                }
+            }
+            items(shown, key = { it.ticker }) { h ->
                 HoldingRow(h, onClick = { onOpenAsset(h.ticker) })
                 HorizontalDivider()
             }
@@ -214,67 +244,6 @@ private fun SummaryCard(state: InvestUiState, onRefresh: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun AllocationCard(state: InvestUiState) {
-    val allocation = state.portfolio.allocation
-    val total = allocation.sumOf { it.second }
-    if (total == 0L) return
-    Card(Modifier.fillMaxWidth().padding(top = 12.dp)) {
-        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            DonutChart(
-                slices = allocation.map { (c, v) -> Color(c.color) to v.toFloat() },
-                onSliceClick = {},
-                modifier = Modifier.size(110.dp),
-            )
-            Column(Modifier.padding(start = 16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Divisão da carteira", style = MaterialTheme.typography.titleSmall)
-                allocation.forEach { (c, v) ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(10.dp).background(Color(c.color), CircleShape))
-                        Spacer(Modifier.width(6.dp))
-                        Text("${c.label} ${v * 100 / total}%", style = MaterialTheme.typography.bodySmall)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun EvolutionCard(history: List<PortfolioPoint>) {
-    val points = history.takeLast(365)
-    val values = points.map { it.valueCents }
-    val invested = points.map { it.investedCents }
-    val max = (values + invested).max()
-    val min = (values + invested).min()
-    Card(Modifier.fillMaxWidth().padding(top = 12.dp)) {
-        Column(Modifier.padding(16.dp)) {
-            Text("Evolução do patrimônio", style = MaterialTheme.typography.titleSmall)
-            Row(Modifier.padding(vertical = 4.dp)) {
-                LegendDot(MaterialTheme.colorScheme.primary, "Patrimônio")
-                Spacer(Modifier.width(16.dp))
-                LegendDot(MaterialTheme.colorScheme.outline, "Investido")
-            }
-            LineChart(
-                series = listOf(MaterialTheme.colorScheme.outline to invested, MaterialTheme.colorScheme.primary to values),
-                max = max,
-                min = min - (max - min) / 10,
-                showPoints = points.size <= 31,
-                modifier = Modifier.fillMaxWidth().height(150.dp),
-            )
-            Row {
-                Text(LocalDate.ofEpochDay(points.first().epochDay).format(SHORT_DATE_FORMAT), style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f))
-                Text(LocalDate.ofEpochDay(points.last().epochDay).format(SHORT_DATE_FORMAT), style = MaterialTheme.typography.labelSmall)
-            }
-            Text(
-                "Um ponto por dia em que as cotações foram atualizadas.",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
     }
 }

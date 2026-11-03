@@ -11,6 +11,9 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
+/** Com menos pontos que isso (com dados por ativo), o histórico de 3 meses é reconstruído. */
+private const val MIN_POINTS_FOR_HISTORY = 20
+
 /** Cotações mais novas que isso não são consultadas de novo ao abrir a tela (economiza o limite do plano). */
 private const val QUOTE_MAX_AGE_MS = 15 * 60 * 1000L
 
@@ -84,7 +87,33 @@ class InvestmentsViewModel(private val repo: InvestRepository, private val cache
         val s = state.value
         val portfolio = buildPortfolio(s.assets, s.operations, quotes.value)
         if (portfolio.holdings.isEmpty()) return
-        repo.saveSnapshot(PortfolioPoint(LocalDate.now().toEpochDay(), portfolio.valueCents, portfolio.investedCents))
+        repo.saveSnapshot(
+            PortfolioPoint(LocalDate.now().toEpochDay(), portfolio.valueCents, portfolio.investedCents, assetPoints(portfolio)),
+        )
+    }
+
+    /** Tenta uma vez por sessão, para não gastar consultas do plano se o brapi tiver pouco histórico. */
+    private var reconstructAttempted = false
+
+    /**
+     * Na primeira vez, monta os últimos 3 meses do gráfico com os preços passados do brapi (1 consulta por ativo).
+     * Depois disso o histórico cresce sozinho com os registros diários.
+     */
+    fun reconstructHistoryIfNeeded() {
+        val s = state.value
+        if (reconstructAttempted || token.value == null || s.portfolio.holdings.isEmpty()) return
+        // Já existe histórico suficiente com dados por ativo (talvez montado no outro aparelho).
+        if (s.history.count { it.assets.isNotEmpty() } >= MIN_POINTS_FOR_HISTORY) return
+        reconstructAttempted = true
+        viewModelScope.launch {
+            val tickers = s.portfolio.holdings.map { it.ticker }
+            val closes = tickers.mapNotNull { t -> priceHistory(t).getOrNull()?.takeIf { it.isNotEmpty() }?.let { t to it } }.toMap()
+            if (closes.isNotEmpty()) {
+                val today = LocalDate.now().toEpochDay()
+                val existing = s.history.filter { it.assets.isNotEmpty() }.map { it.epochDay }.toSet() + today
+                repo.saveSnapshots(reconstructHistory(s.operations, closes, existing))
+            }
+        }
     }
 
     /** Preços de fechamento dos últimos 3 meses (consulta uma vez por sessão). */

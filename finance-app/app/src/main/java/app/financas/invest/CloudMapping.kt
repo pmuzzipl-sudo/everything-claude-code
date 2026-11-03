@@ -33,8 +33,18 @@ fun operationFromCloud(id: Long, data: Map<String, Any?>): AssetOperation? = run
     )
 }.getOrNull()
 
-fun PortfolioPoint.toCloud(): Map<String, Any?> = mapOf("valueCents" to valueCents, "investedCents" to investedCents)
+fun PortfolioPoint.toCloud(): Map<String, Any?> = mapOf(
+    "valueCents" to valueCents,
+    "investedCents" to investedCents,
+    "assets" to assets.mapValues { (_, p) -> mapOf("v" to p.valueCents, "c" to p.costCents) },
+)
 
 fun pointFromCloud(epochDay: Long, data: Map<String, Any?>): PortfolioPoint? = runCatching {
-    PortfolioPoint(epochDay, (data["valueCents"] as Number).toLong(), (data["investedCents"] as Number).toLong())
+    val assets = (data["assets"] as? Map<*, *>).orEmpty().mapNotNull { (ticker, value) ->
+        val m = value as? Map<*, *> ?: return@mapNotNull null
+        val v = (m["v"] as? Number)?.toLong() ?: return@mapNotNull null
+        val c = (m["c"] as? Number)?.toLong() ?: return@mapNotNull null
+        (ticker as? String ?: return@mapNotNull null) to AssetPoint(v, c)
+    }.toMap()
+    PortfolioPoint(epochDay, (data["valueCents"] as Number).toLong(), (data["investedCents"] as Number).toLong(), assets)
 }.getOrNull()
