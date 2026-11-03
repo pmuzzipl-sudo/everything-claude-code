@@ -181,14 +181,21 @@ private fun FilterLabel(text: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun LineChart(series: List<Pair<Color, List<Long>>>, max: Long, modifier: Modifier = Modifier) {
+internal fun LineChart(
+    series: List<Pair<Color, List<Long>>>,
+    max: Long,
+    modifier: Modifier = Modifier,
+    min: Long = 0,
+    showPoints: Boolean = true,
+) {
     val grid = MaterialTheme.colorScheme.outlineVariant
     Canvas(modifier) {
         val count = series.first().second.size
         val stepX = if (count > 1) size.width / (count - 1) else 0f
         val top = 8.dp.toPx()
         val chartHeight = size.height - top
-        fun y(value: Long) = top + chartHeight * (1f - value.toFloat() / max.coerceAtLeast(1))
+        val span = (max - min).coerceAtLeast(1)
+        fun y(value: Long) = top + chartHeight * (1f - (value - min).toFloat() / span)
 
         // Linhas de referência em 0%, 25%, 50%, 75% e 100% do máximo.
         for (i in 0..4) {
@@ -203,7 +210,7 @@ private fun LineChart(series: List<Pair<Color, List<Long>>>, max: Long, modifier
                 if (i == 0) path.moveTo(point.x, point.y) else path.lineTo(point.x, point.y)
             }
             drawPath(path, color, style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
-            values.forEachIndexed { i, v -> drawCircle(color, radius = 4.dp.toPx(), center = Offset(stepX * i, y(v))) }
+            if (showPoints) values.forEachIndexed { i, v -> drawCircle(color, radius = 4.dp.toPx(), center = Offset(stepX * i, y(v))) }
         }
     }
 }

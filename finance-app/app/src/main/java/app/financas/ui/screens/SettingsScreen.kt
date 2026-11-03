@@ -22,6 +22,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -35,19 +36,28 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import app.financas.data.AppSettings
 import app.financas.reminders.DueBillsWorker
 import app.financas.security.AppLock
 
 @Composable
-fun SettingsScreen(accountEmail: String?, onSignOut: () -> Unit, onBack: () -> Unit) {
+fun SettingsScreen(
+    accountEmail: String?,
+    onSignOut: () -> Unit,
+    brapiToken: String?,
+    onSaveToken: (String?) -> Unit,
+    onBack: () -> Unit,
+) {
     val context = LocalContext.current
     val settings = remember { AppSettings(context) }
     var lockEnabled by remember { mutableStateOf(settings.lockEnabled) }
     var reminders by remember { mutableStateOf(settings.remindersEnabled) }
     var message by remember { mutableStateOf<String?>(null) }
     var confirmSignOut by remember { mutableStateOf(false) }
+    var tokenInput by remember(brapiToken) { mutableStateOf(brapiToken.orEmpty()) }
+    var tokenSaved by remember { mutableStateOf(false) }
     val askPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (!granted) message = "Sem permissão de notificação, os lembretes não aparecem. Ative nas configurações do Android."
     }
@@ -98,6 +108,31 @@ fun SettingsScreen(accountEmail: String?, onSignOut: () -> Unit, onBack: () -> U
                     }
                 },
             )
+            HorizontalDivider(Modifier.padding(vertical = 8.dp))
+
+            SectionTitle("Cotações (investimentos)")
+            Text(
+                "As cotações vêm do brapi.dev. Crie uma conta gratuita em brapi.dev, copie sua chave (token) " +
+                    "no painel e cole abaixo. Ela fica salva na sua conta e vale para todos os aparelhos.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OutlinedTextField(
+                value = tokenInput,
+                onValueChange = { tokenInput = it.trim(); tokenSaved = false },
+                label = { Text("Chave do brapi.dev") },
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedButton(
+                    onClick = { onSaveToken(tokenInput.ifBlank { null }); tokenSaved = true },
+                    enabled = tokenInput != brapiToken.orEmpty(),
+                    modifier = Modifier.padding(top = 8.dp),
+                ) { Text("Salvar chave") }
+                if (tokenSaved) Text("Salva!", Modifier.padding(start = 12.dp), color = MaterialTheme.colorScheme.primary)
+            }
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
 
             SectionTitle("Conta")

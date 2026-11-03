@@ -192,7 +192,7 @@ private fun Legend(color: Color, label: String) {
 }
 
 @Composable
-private fun DonutChart(slices: List<Pair<Color, Float>>, onSliceClick: (Int) -> Unit, modifier: Modifier = Modifier) {
+internal fun DonutChart(slices: List<Pair<Color, Float>>, onSliceClick: (Int) -> Unit, modifier: Modifier = Modifier) {
     val total = slices.sumOf { it.second.toDouble() }.toFloat()
     Canvas(
         modifier.pointerInput(slices) {

@@ -17,15 +17,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.EventBusy
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -68,8 +65,6 @@ fun HomeScreen(
     onAdd: () -> Unit,
     onOpen: (Transaction) -> Unit,
     onTogglePaid: (Transaction) -> Unit,
-    onSearch: () -> Unit,
-    onSettings: () -> Unit,
 ) {
     val alerts = state.budgets.filter { it.isOver || it.isNear }
     var tab by rememberSaveable { mutableStateOf(HomeTab.VARIABLE) }
@@ -77,13 +72,6 @@ fun HomeScreen(
     val shown = state.transactions.filter(tab.filter)
     Box(Modifier.fillMaxSize()) {
         LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 88.dp)) {
-            item {
-                Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Minhas Finanças", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-                    IconButton(onClick = onSearch) { Icon(Icons.Filled.Search, contentDescription = "Buscar") }
-                    IconButton(onClick = onSettings) { Icon(Icons.Filled.Settings, contentDescription = "Configurações") }
-                }
-            }
             item { MonthSelector(state.month, onPreviousMonth, onNextMonth) }
             item { SummaryCard(state) }
             if (state.dueBills.isNotEmpty()) {

@@ -1,6 +1,21 @@
 package app.financas.ui
 
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
+import app.financas.invest.InvestmentsViewModel
+import app.financas.ui.invest.AssetDetailScreen
+import app.financas.ui.invest.EditOperationScreen
+import app.financas.ui.invest.InvestmentsScreen
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.EventRepeat
@@ -50,14 +65,25 @@ private const val EDIT_ROUTE = "edit?id={id}"
 private const val CATEGORY_ROUTE = "category/{category}"
 private const val SEARCH_ROUTE = "search"
 private const val SETTINGS_ROUTE = "settings"
+private const val INVEST_ROUTE = "investments"
+private const val ASSET_ROUTE = "investments/asset/{ticker}"
+private const val OPERATION_ROUTE = "investments/op?id={id}&ticker={ticker}"
+
+private fun operationRoute(id: Long?, ticker: String?) = buildString {
+    append("investments/op")
+    val params = listOfNotNull(id?.let { "id=$it" }, ticker?.let { "ticker=$it" })
+    if (params.isNotEmpty()) append("?").append(params.joinToString("&"))
+}
 private const val EDIT_FIXED_ROUTE = "fixed/edit?id={id}"
 private fun editFixedRoute(id: Long?) = if (id == null) "fixed/edit" else "fixed/edit?id=$id"
 private fun editRoute(id: Long?) = if (id == null) "edit" else "edit?id=$id"
 
 @Composable
-fun FinanceApp(vm: FinanceViewModel, accountEmail: String?, onSignOut: () -> Unit) {
+fun FinanceApp(vm: FinanceViewModel, investVm: InvestmentsViewModel, accountEmail: String?, onSignOut: () -> Unit) {
     val nav = rememberNavController()
     val state by vm.state.collectAsStateWithLifecycle()
+    val investState by investVm.state.collectAsStateWithLifecycle()
+    val brapiToken by investVm.token.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val backStack by nav.currentBackStackEntryAsState()
     val currentRoute = backStack?.destination?.route
@@ -66,8 +92,29 @@ fun FinanceApp(vm: FinanceViewModel, accountEmail: String?, onSignOut: () -> Uni
         vm.events.collect { snackbar.showSnackbar(it, duration = SnackbarDuration.Long) }
     }
 
+    val inFinance = Tab.entries.any { it.route == currentRoute }
+    val inInvestments = currentRoute == INVEST_ROUTE
+    // Leva à tela principal de uma das duas áreas, sem empilhar telas.
+    val goTo = { route: String ->
+        nav.navigate(route) {
+            popUpTo(nav.graph.findStartDestination().id) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
+        topBar = {
+            if (inFinance || inInvestments) {
+                AreaSelector(
+                    investments = inInvestments,
+                    onSelect = { investments -> goTo(if (investments) INVEST_ROUTE else Tab.HOME.route) },
+                    onSearch = if (inFinance) ({ nav.navigate(SEARCH_ROUTE) }) else null,
+                    onSettings = { nav.navigate(SETTINGS_ROUTE) },
+                )
+            }
+        },
         bottomBar = {
             if (Tab.entries.any { it.route == currentRoute }) {
                 NavigationBar {
@@ -98,8 +145,6 @@ fun FinanceApp(vm: FinanceViewModel, accountEmail: String?, onSignOut: () -> Uni
                     onAdd = { nav.navigate(editRoute(null)) },
                     onOpen = { nav.navigate(editRoute(it.id)) },
                     onTogglePaid = vm::togglePaid,
-                    onSearch = { nav.navigate(SEARCH_ROUTE) },
-                    onSettings = { nav.navigate(SETTINGS_ROUTE) },
                 )
             }
             composable(SEARCH_ROUTE) {
@@ -112,7 +157,51 @@ fun FinanceApp(vm: FinanceViewModel, accountEmail: String?, onSignOut: () -> Uni
                 )
             }
             composable(SETTINGS_ROUTE) {
-                SettingsScreen(accountEmail = accountEmail, onSignOut = onSignOut, onBack = { nav.popBackStack() })
+                SettingsScreen(
+                    accountEmail = accountEmail,
+                    onSignOut = onSignOut,
+                    brapiToken = brapiToken,
+                    onSaveToken = investVm::setToken,
+                    onBack = { nav.popBackStack() },
+                )
+            }
+            composable(INVEST_ROUTE) {
+                InvestmentsScreen(
+                    state = investState,
+                    onRefresh = investVm::refresh,
+                    onAddOperation = { nav.navigate(operationRoute(null, null)) },
+                    onOpenAsset = { nav.navigate("investments/asset/$it") },
+                    onOpenSettings = { nav.navigate(SETTINGS_ROUTE) },
+                )
+            }
+            composable(ASSET_ROUTE) { entry ->
+                val ticker = entry.arguments?.getString("ticker") ?: return@composable
+                AssetDetailScreen(
+                    ticker = ticker,
+                    state = investState,
+                    loadHistory = investVm::priceHistory,
+                    onAddOperation = { nav.navigate(operationRoute(null, ticker)) },
+                    onOpenOperation = { nav.navigate(operationRoute(it.id, null)) },
+                    onSetClass = { investVm.setAssetClass(ticker, it) },
+                    onDeleteAsset = { investVm.deleteAsset(ticker); nav.popBackStack() },
+                    onBack = { nav.popBackStack() },
+                )
+            }
+            composable(
+                OPERATION_ROUTE,
+                arguments = listOf(
+                    navArgument("id") { type = NavType.LongType; defaultValue = -1L },
+                    navArgument("ticker") { type = NavType.StringType; nullable = true; defaultValue = null },
+                ),
+            ) { entry ->
+                EditOperationScreen(
+                    id = entry.arguments?.getLong("id")?.takeIf { it > 0 },
+                    presetTicker = entry.arguments?.getString("ticker"),
+                    state = investState,
+                    onSave = { op, assetClass -> investVm.saveOperation(op, assetClass); nav.popBackStack() },
+                    onDelete = { investVm.deleteOperation(it); nav.popBackStack() },
+                    onBack = { nav.popBackStack() },
+                )
             }
             composable(Tab.CHARTS.route) {
                 ChartsScreen(
@@ -175,5 +264,32 @@ fun FinanceApp(vm: FinanceViewModel, accountEmail: String?, onSignOut: () -> Uni
                 )
             }
         }
+    }
+}
+
+/** Seletor das duas áreas do app, com os atalhos de busca (só em Finanças) e configurações. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AreaSelector(
+    investments: Boolean,
+    onSelect: (investments: Boolean) -> Unit,
+    onSearch: (() -> Unit)?,
+    onSettings: () -> Unit,
+) {
+    Row(
+        Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        SingleChoiceSegmentedButtonRow(Modifier.weight(1f)) {
+            listOf(false to "Finanças", true to "Investimentos").forEachIndexed { index, (value, label) ->
+                SegmentedButton(
+                    selected = investments == value,
+                    onClick = { if (investments != value) onSelect(value) },
+                    shape = SegmentedButtonDefaults.itemShape(index, 2),
+                ) { Text(label, maxLines = 1) }
+            }
+        }
+        if (onSearch != null) IconButton(onClick = onSearch) { Icon(Icons.Filled.Search, contentDescription = "Buscar") }
+        IconButton(onClick = onSettings) { Icon(Icons.Filled.Settings, contentDescription = "Configurações") }
     }
 }

@@ -46,3 +46,26 @@ val DATE_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy", P
 
 /** "05/11" */
 val SHORT_DATE_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM", PT_BR)
+
+/**
+ * Número decimal digitado ("52,3456", "1.234,5", "10"). Diferente de [parseMoney], mantém mais de duas casas
+ * (preço médio de corretora costuma ter quatro). Retorna null se inválido ou não positivo.
+ */
+fun parseDecimal(input: String): BigDecimal? {
+    var s = input.trim().replace("R$", "").replace(" ", "")
+    if (s.isEmpty()) return null
+    s = if (s.contains(',')) s.replace(".", "").replace(',', '.') else s
+    return s.toBigDecimalOrNull()?.takeIf { it.signum() > 0 }
+}
+
+private val priceFormat: NumberFormat = NumberFormat.getCurrencyInstance(PT_BR).apply {
+    minimumFractionDigits = 2
+    maximumFractionDigits = 4
+}
+
+/** Preço unitário em reais com até 4 casas: 52.3456 -> "R$ 52,3456"; 52.5 -> "R$ 52,50". */
+fun formatPrice(reais: Double): String = priceFormat.format(reais)
+
+/** 0.1234 -> "+12,34%" */
+fun formatPercent(ratio: Double): String =
+    (if (ratio > 0) "+" else "") + String.format(PT_BR, "%.2f%%", ratio * 100)

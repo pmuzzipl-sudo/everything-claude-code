@@ -158,7 +158,7 @@ class CloudRepository(uid: String, private val db: FirebaseFirestore = FirebaseF
 }
 
 /** Escuta a consulta em tempo real (inclui alterações feitas no outro aparelho). */
-private fun <T> Query.listen(map: (QuerySnapshot) -> T): Flow<T> = callbackFlow {
+internal fun <T> Query.listen(map: (QuerySnapshot) -> T): Flow<T> = callbackFlow {
     val registration = addSnapshotListener { snap, error ->
         // Em caso de erro (ex.: sem permissão), mantém os últimos dados exibidos.
         if (error == null && snap != null) trySend(map(snap))

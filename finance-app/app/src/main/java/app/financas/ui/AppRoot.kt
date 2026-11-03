@@ -26,6 +26,9 @@ import app.financas.data.CloudRepository
 import app.financas.data.FinanceRepository
 import app.financas.data.LegacyData
 import app.financas.data.LegacySnapshot
+import app.financas.invest.InvestRepository
+import app.financas.invest.InvestmentsViewModel
+import app.financas.invest.QuoteCache
 import app.financas.reminders.DueBillsWorker
 import app.financas.security.AppLock
 import app.financas.security.LockScreen
@@ -58,7 +61,13 @@ fun AppRoot() {
             key = current.uid,
             factory = viewModelFactory { initializer { FinanceViewModel(repo) } },
         )
-        FinanceApp(vm = vm, accountEmail = current.email, onSignOut = { auth.signOut() })
+        val investVm: InvestmentsViewModel = viewModel(
+            key = "invest-" + current.uid,
+            factory = viewModelFactory {
+                initializer { InvestmentsViewModel(InvestRepository(current.uid), QuoteCache(context)) }
+            },
+        )
+        FinanceApp(vm = vm, investVm = investVm, accountEmail = current.email, onSignOut = { auth.signOut() })
         LegacyImportDialog(repo)
         RemindersSetup(settings)
     }

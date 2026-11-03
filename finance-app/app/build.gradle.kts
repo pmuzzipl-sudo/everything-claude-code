@@ -16,8 +16,8 @@ android {
         applicationId = "app.financas"
         minSdk = 26
         targetSdk = 34
-        versionCode = 8
-        versionName = "3.0"
+        versionCode = 9
+        versionName = "4.0"
     }
 
     // Chave fixa: toda versão precisa da mesma assinatura para atualizar o app sem desinstalar.
@@ -92,4 +92,6 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.robolectric:robolectric:4.13")
     testImplementation("androidx.test:core:1.6.1")
+    // Implementação real do org.json nos testes (no Android ela vem do sistema).
+    testImplementation("org.json:json:20240303")
 }

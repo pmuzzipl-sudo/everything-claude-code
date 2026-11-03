@@ -16,6 +16,11 @@ no próprio celular.
   lembrete diário por notificação.
 - **Busca**: encontre lançamentos por descrição ou categoria, tipo, valor e período.
 - **Bloqueio**: opcionalmente, o app pede a digital ou o PIN do aparelho para abrir.
+- **Investimentos**: área separada (seletor Finanças | Investimentos no topo) para a carteira de ETFs/ações da B3.
+  Cadastre a posição inicial (quantidade e preço médio) e registre compras e vendas: o preço médio é recalculado
+  pela regra da Receita (taxas entram no custo; vendas não mudam o preço médio e geram lucro realizado). Cotações
+  com atraso pelo [brapi.dev](https://brapi.dev) (chave gratuita em Configurações), divisão por classe, evolução do
+  patrimônio e gráfico de 3 meses de cada ativo.
 - **Sincronização**: os dados ficam na conta Google do usuário (Firebase) e aparecem em todos os aparelhos.
 - **Gráficos**: gráfico de rosca com despesas ou receitas por categoria e gráfico de barras dos últimos 6 meses.
   Toque em uma categoria para ver os lançamentos dela, agrupados por descrições parecidas.
