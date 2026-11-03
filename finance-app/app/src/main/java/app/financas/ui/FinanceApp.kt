@@ -173,6 +173,7 @@ fun FinanceApp(vm: FinanceViewModel, investVm: InvestmentsViewModel, accountEmai
                     onRefresh = investVm::refresh,
                     onAddOperation = { nav.navigate(operationRoute(null, null)) },
                     onOpenAsset = { nav.navigate("investments/asset/$it") },
+                    onOpenOperation = { nav.navigate(operationRoute(it.id, null)) },
                     onOpenSettings = { nav.navigate(SETTINGS_ROUTE) },
                     onOpenTargets = { nav.navigate(TARGETS_ROUTE) },
                 )

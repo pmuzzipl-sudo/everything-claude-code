@@ -30,10 +30,16 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -43,6 +49,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import app.financas.invest.AssetOperation
 import app.financas.invest.Holding
 import app.financas.invest.InvestUiState
 import app.financas.invest.PortfolioPoint
@@ -70,77 +77,101 @@ fun InvestmentsScreen(
     onRefresh: (force: Boolean) -> Unit,
     onAddOperation: () -> Unit,
     onOpenAsset: (String) -> Unit,
+    onOpenOperation: (AssetOperation) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenTargets: () -> Unit,
 ) {
     val tickers = state.portfolio.holdings.map { it.ticker }
     // Ao abrir (ou ao mudar a carteira/chave), atualiza cotações que estiverem antigas.
     LaunchedEffect(state.hasToken, tickers) { if (state.hasToken) onRefresh(false) }
+    var tab by rememberSaveable { mutableIntStateOf(0) }
 
-    Box(Modifier.fillMaxSize()) {
-        LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp)) {
-            if (!state.hasToken) {
-                item {
-                    Card(Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
-                        Column(Modifier.padding(16.dp)) {
-                            Text("Cotações automáticas", style = MaterialTheme.typography.titleSmall)
-                            Text(
-                                "Cadastre a chave gratuita do brapi.dev nas Configurações para ver o valor atual da carteira.",
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.padding(vertical = 4.dp),
-                            )
-                            Button(onClick = onOpenSettings) { Text("Abrir Configurações") }
-                        }
-                    }
-                }
+    Column(Modifier.fillMaxSize()) {
+        TabRow(selectedTabIndex = tab) {
+            listOf("Carteira", "Lançamentos").forEachIndexed { i, label ->
+                Tab(selected = tab == i, onClick = { tab = i }, text = { Text(label) })
             }
-            item { SummaryCard(state, onRefresh = { onRefresh(true) }) }
-            state.error?.let { msg ->
-                item { Text(msg, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp)) }
-            }
-            if (state.portfolio.holdings.isEmpty()) {
-                item {
-                    Text(
-                        "Nenhum ativo ainda.\nToque em \"Nova operação\" e cadastre a posição inicial de cada ETF " +
-                            "(quantidade e preço médio).",
-                        textAlign = TextAlign.Center,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
-                    )
-                }
+        }
+        Box(Modifier.weight(1f)) {
+            if (tab == 0) {
+                PortfolioTab(state, onRefresh, onOpenAsset, onOpenSettings, onOpenTargets)
             } else {
-                item { AllocationCard(state) }
-                item { TargetsCard(state, onOpenTargets) }
-                if (state.history.size >= 2) item { EvolutionCard(state.history) }
-                item { Text("Ativos", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp)) }
-                items(state.portfolio.holdings, key = { it.ticker }) { h ->
-                    HoldingRow(h, onClick = { onOpenAsset(h.ticker) })
-                    HorizontalDivider()
-                }
+                OperationsTab(state, onOpenOperation)
             }
-            if (state.portfolio.closed.isNotEmpty()) {
-                item {
-                    Text("Vendidos", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
-                }
-                items(state.portfolio.closed, key = { "closed-" + it.ticker }) { h ->
-                    Row(Modifier.fillMaxWidth().clickable { onOpenAsset(h.ticker) }.padding(vertical = 10.dp)) {
-                        Text(h.ticker, Modifier.weight(1f))
+            ExtendedFloatingActionButton(
+                onClick = onAddOperation,
+                icon = { Icon(Icons.Filled.Add, contentDescription = null) },
+                text = { Text(if (tab == 0) "Nova operação" else "Novo lançamento") },
+                modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun PortfolioTab(
+    state: InvestUiState,
+    onRefresh: (force: Boolean) -> Unit,
+    onOpenAsset: (String) -> Unit,
+    onOpenSettings: () -> Unit,
+    onOpenTargets: () -> Unit,
+) {
+    LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp)) {
+        if (!state.hasToken) {
+            item {
+                Card(Modifier.fillMaxWidth().padding(bottom = 12.dp)) {
+                    Column(Modifier.padding(16.dp)) {
+                        Text("Cotações automáticas", style = MaterialTheme.typography.titleSmall)
                         Text(
-                            "Lucro realizado ${formatMoney(h.position.realizedCents)}",
-                            color = if (h.position.realizedCents < 0) ExpenseColor else IncomeColor,
+                            "Cadastre a chave gratuita do brapi.dev nas Configurações para ver o valor atual da carteira.",
                             style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(vertical = 4.dp),
                         )
+                        Button(onClick = onOpenSettings) { Text("Abrir Configurações") }
                     }
-                    HorizontalDivider()
                 }
             }
         }
-        ExtendedFloatingActionButton(
-            onClick = onAddOperation,
-            icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-            text = { Text("Nova operação") },
-            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
-        )
+        item { SummaryCard(state, onRefresh = { onRefresh(true) }) }
+        state.error?.let { msg ->
+            item { Text(msg, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp)) }
+        }
+        if (state.portfolio.holdings.isEmpty()) {
+            item {
+                Text(
+                    "Nenhum ativo ainda.\nToque em \"Nova operação\" e cadastre a posição inicial de cada ETF " +
+                        "(quantidade e preço médio).",
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
+                )
+            }
+        } else {
+            item { AllocationCard(state) }
+            item { TargetsCard(state, onOpenTargets) }
+            if (state.history.size >= 2) item { EvolutionCard(state.history) }
+            item { Text("Ativos", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp)) }
+            items(state.portfolio.holdings, key = { it.ticker }) { h ->
+                HoldingRow(h, onClick = { onOpenAsset(h.ticker) })
+                HorizontalDivider()
+            }
+        }
+        if (state.portfolio.closed.isNotEmpty()) {
+            item {
+                Text("Vendidos", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp))
+            }
+            items(state.portfolio.closed, key = { "closed-" + it.ticker }) { h ->
+                Row(Modifier.fillMaxWidth().clickable { onOpenAsset(h.ticker) }.padding(vertical = 10.dp)) {
+                    Text(h.ticker, Modifier.weight(1f))
+                    Text(
+                        "Lucro realizado ${formatMoney(h.position.realizedCents)}",
+                        color = if (h.position.realizedCents < 0) ExpenseColor else IncomeColor,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                HorizontalDivider()
+            }
+        }
     }
 }
 
