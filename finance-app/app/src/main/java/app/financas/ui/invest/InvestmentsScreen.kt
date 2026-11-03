@@ -1,5 +1,6 @@
 package app.financas.ui.invest
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -30,10 +31,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -41,10 +46,12 @@ import androidx.compose.ui.unit.dp
 import app.financas.invest.Holding
 import app.financas.invest.InvestUiState
 import app.financas.invest.PortfolioPoint
+import app.financas.invest.targetsSummary
 import app.financas.ui.screens.DonutChart
 import app.financas.ui.screens.LineChart
 import app.financas.ui.theme.ExpenseColor
 import app.financas.ui.theme.IncomeColor
+import app.financas.ui.theme.WarningColor
 import app.financas.util.SHORT_DATE_FORMAT
 import app.financas.util.formatMoney
 import app.financas.util.formatPercent
@@ -53,6 +60,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import kotlin.math.abs
 
 private val TIME = DateTimeFormatter.ofPattern("dd/MM HH:mm")
 
@@ -63,6 +71,7 @@ fun InvestmentsScreen(
     onAddOperation: () -> Unit,
     onOpenAsset: (String) -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenTargets: () -> Unit,
 ) {
     val tickers = state.portfolio.holdings.map { it.ticker }
     // Ao abrir (ou ao mudar a carteira/chave), atualiza cotações que estiverem antigas.
@@ -101,6 +110,7 @@ fun InvestmentsScreen(
                 }
             } else {
                 item { AllocationCard(state) }
+                item { TargetsCard(state, onOpenTargets) }
                 if (state.history.size >= 2) item { EvolutionCard(state.history) }
                 item { Text("Ativos", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp)) }
                 items(state.portfolio.holdings, key = { it.ticker }) { h ->
@@ -277,4 +287,83 @@ internal fun resultColor(cents: Long): Color = when {
     cents > 0 -> IncomeColor
     cents < 0 -> ExpenseColor
     else -> MaterialTheme.colorScheme.onSurfaceVariant
+}
+
+/** Participação atual × meta de cada ativo, com quanto comprar ou quanto está acima. */
+@Composable
+private fun TargetsCard(state: InvestUiState, onOpenTargets: () -> Unit) {
+    val summary = targetsSummary(state.portfolio)
+    Card(Modifier.fillMaxWidth().padding(top = 12.dp)) {
+        Column(Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Metas da carteira", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                TextButton(onClick = onOpenTargets) { Text(if (summary.hasTargets) "Metas e aporte" else "Definir metas") }
+            }
+            if (!summary.hasTargets) {
+                Text(
+                    "Defina quanto cada ativo deve representar na carteira e acompanhe se está acima ou abaixo da meta.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                return@Column
+            }
+            if (!summary.isComplete) {
+                Text(
+                    "As metas somam ${formatBps(summary.targetSumBps)} (o ideal é 100%).",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ExpenseColor,
+                    modifier = Modifier.padding(bottom = 4.dp),
+                )
+            }
+            summary.rows.forEach { row ->
+                val target = row.targetRatio
+                Column(Modifier.padding(vertical = 6.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(row.ticker, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                        Text(
+                            "${formatRatio(row.currentRatio)}" + (target?.let { " / meta ${formatRatio(it)}" } ?: " / sem meta"),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    TargetBar(row.currentRatio, target, Color(row.holding.asset.assetClass.color))
+                    row.adjustCents(summary.totalCents)?.let { adjust ->
+                        val diff = row.diffRatio ?: 0.0
+                        Text(
+                            when {
+                                abs(diff) < 0.005 -> "Na meta"
+                                adjust > 0 -> "Abaixo da meta: comprar ${formatMoney(adjust)}"
+                                else -> "Acima da meta em ${formatMoney(-adjust)}"
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = when {
+                                abs(diff) < 0.005 -> MaterialTheme.colorScheme.onSurfaceVariant
+                                adjust > 0 -> WarningColor
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Barra com a participação atual; o traço marca a meta. */
+@Composable
+private fun TargetBar(current: Double, target: Double?, color: Color) {
+    val track = MaterialTheme.colorScheme.surfaceVariant
+    val marker = MaterialTheme.colorScheme.onSurface
+    Canvas(Modifier.fillMaxWidth().height(10.dp).padding(vertical = 2.dp)) {
+        val r = CornerRadius(size.height / 2)
+        drawRoundRect(track, cornerRadius = r)
+        drawRoundRect(
+            color,
+            size = Size(size.width * current.toFloat().coerceIn(0f, 1f), size.height),
+            cornerRadius = r,
+        )
+        if (target != null) {
+            val x = size.width * target.toFloat().coerceIn(0f, 1f)
+            drawLine(marker, Offset(x, -4f), Offset(x, size.height + 4f), strokeWidth = 4f)
+        }
+    }
 }

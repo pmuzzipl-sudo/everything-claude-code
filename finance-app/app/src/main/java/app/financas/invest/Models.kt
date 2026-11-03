@@ -11,7 +11,8 @@ enum class AssetClass(val label: String, val color: Long) {
     OTHER("Outros", 0xFF9A9A9A),
 }
 
-data class Asset(val ticker: String, val assetClass: AssetClass)
+/** [targetBps] = meta de participação na carteira em centésimos de ponto percentual (2500 = 25%). */
+data class Asset(val ticker: String, val assetClass: AssetClass, val targetBps: Int? = null)
 
 enum class OperationKind(val label: String) {
     /** Posição que o usuário já tinha antes de usar o app (quantidade e preço médio). */

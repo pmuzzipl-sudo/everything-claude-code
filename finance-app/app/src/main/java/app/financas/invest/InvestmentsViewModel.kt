@@ -97,13 +97,16 @@ class InvestmentsViewModel(private val repo: InvestRepository, private val cache
 
     /** Salva a operação; [assetClass] cria ou altera a classe do ativo. */
     fun saveOperation(operation: AssetOperation, assetClass: AssetClass?) {
-        if (assetClass != null) repo.saveAsset(Asset(operation.ticker, assetClass))
+        if (assetClass != null) repo.saveAssetClass(operation.ticker, assetClass)
         repo.saveOperation(operation)
     }
 
     fun deleteOperation(operation: AssetOperation) = repo.deleteOperation(operation)
 
-    fun setAssetClass(ticker: String, assetClass: AssetClass) = repo.saveAsset(Asset(ticker, assetClass))
+    fun setAssetClass(ticker: String, assetClass: AssetClass) = repo.saveAssetClass(ticker, assetClass)
+
+    /** Metas em pontos-base por ticker (null remove). */
+    fun saveTargets(targets: Map<String, Int?>) = repo.saveTargets(targets)
 
     fun deleteAsset(ticker: String) {
         viewModelScope.launch {

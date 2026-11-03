@@ -1,9 +1,13 @@
 package app.financas.invest
 
-fun Asset.toCloud(): Map<String, Any?> = mapOf("assetClass" to assetClass.name)
+fun Asset.toCloud(): Map<String, Any?> = mapOf("assetClass" to assetClass.name, "targetBps" to targetBps)
 
 fun assetFromCloud(ticker: String, data: Map<String, Any?>): Asset? = runCatching {
-    Asset(ticker, (data["assetClass"] as? String)?.let(AssetClass::valueOf) ?: AssetClass.OTHER)
+    Asset(
+        ticker = ticker,
+        assetClass = (data["assetClass"] as? String)?.let(AssetClass::valueOf) ?: AssetClass.OTHER,
+        targetBps = (data["targetBps"] as? Number)?.toInt(),
+    )
 }.getOrNull()
 
 fun AssetOperation.toCloud(): Map<String, Any?> = mapOf(

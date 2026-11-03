@@ -2,7 +2,9 @@ package app.financas.invest
 
 import app.financas.data.listen
 import app.financas.data.newCloudId
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -33,8 +35,19 @@ class InvestRepository(uid: String, private val db: FirebaseFirestore = Firebase
                 .sortedBy { it.epochDay }
         }
 
-    fun saveAsset(asset: Asset) {
-        assets.document(asset.ticker).set(asset.toCloud())
+    /** Define a classe sem apagar a meta já cadastrada (gravação parcial). */
+    fun saveAssetClass(ticker: String, assetClass: AssetClass) {
+        assets.document(ticker).set(mapOf("assetClass" to assetClass.name), SetOptions.merge())
+    }
+
+    /** Grava as metas de vários ativos de uma vez; null remove a meta. Não mexe na classe. */
+    fun saveTargets(targets: Map<String, Int?>) {
+        if (targets.isEmpty()) return
+        val batch = db.batch()
+        targets.forEach { (ticker, bps) ->
+            batch.set(assets.document(ticker), mapOf("targetBps" to (bps ?: FieldValue.delete())), SetOptions.merge())
+        }
+        batch.commit()
     }
 
     fun saveOperation(operation: AssetOperation) {

@@ -16,6 +16,7 @@ import app.financas.invest.InvestmentsViewModel
 import app.financas.ui.invest.AssetDetailScreen
 import app.financas.ui.invest.EditOperationScreen
 import app.financas.ui.invest.InvestmentsScreen
+import app.financas.ui.invest.TargetsScreen
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.EventRepeat
@@ -67,6 +68,7 @@ private const val SEARCH_ROUTE = "search"
 private const val SETTINGS_ROUTE = "settings"
 private const val INVEST_ROUTE = "investments"
 private const val ASSET_ROUTE = "investments/asset/{ticker}"
+private const val TARGETS_ROUTE = "investments/targets"
 private const val OPERATION_ROUTE = "investments/op?id={id}&ticker={ticker}"
 
 private fun operationRoute(id: Long?, ticker: String?) = buildString {
@@ -172,7 +174,11 @@ fun FinanceApp(vm: FinanceViewModel, investVm: InvestmentsViewModel, accountEmai
                     onAddOperation = { nav.navigate(operationRoute(null, null)) },
                     onOpenAsset = { nav.navigate("investments/asset/$it") },
                     onOpenSettings = { nav.navigate(SETTINGS_ROUTE) },
+                    onOpenTargets = { nav.navigate(TARGETS_ROUTE) },
                 )
+            }
+            composable(TARGETS_ROUTE) {
+                TargetsScreen(state = investState, onSave = investVm::saveTargets, onBack = { nav.popBackStack() })
             }
             composable(ASSET_ROUTE) { entry ->
                 val ticker = entry.arguments?.getString("ticker") ?: return@composable
