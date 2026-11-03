@@ -40,6 +40,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import app.financas.data.AppSettings
 import app.financas.reminders.DueBillsWorker
+import app.financas.reminders.MonthlyQuotesWorker
 import app.financas.security.AppLock
 
 @Composable
@@ -54,6 +55,7 @@ fun SettingsScreen(
     val settings = remember { AppSettings(context) }
     var lockEnabled by remember { mutableStateOf(settings.lockEnabled) }
     var reminders by remember { mutableStateOf(settings.remindersEnabled) }
+    var monthly by remember { mutableStateOf(settings.monthlyQuotesReminder) }
     var message by remember { mutableStateOf<String?>(null) }
     var confirmSignOut by remember { mutableStateOf(false) }
     var tokenInput by remember(brapiToken) { mutableStateOf(brapiToken.orEmpty()) }
@@ -105,6 +107,23 @@ fun SettingsScreen(
                         }
                     } else {
                         DueBillsWorker.cancel(context)
+                    }
+                },
+            )
+            SettingSwitch(
+                title = "Lembrete mensal da carteira",
+                subtitle = "No dia 1º de cada mês, lembra de abrir Investimentos para atualizar as cotações e registrar o mês no acompanhamento de longo prazo.",
+                checked = monthly,
+                onChange = { on ->
+                    settings.monthlyQuotesReminder = on
+                    monthly = on
+                    if (on) {
+                        MonthlyQuotesWorker.schedule(context)
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            askPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                    } else {
+                        MonthlyQuotesWorker.cancel(context)
                     }
                 },
             )

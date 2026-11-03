@@ -13,6 +13,7 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
 import app.financas.invest.InvestmentsViewModel
+import app.financas.reminders.AREA_INVESTMENTS
 import app.financas.ui.invest.AssetDetailScreen
 import app.financas.ui.invest.EditOperationScreen
 import app.financas.ui.invest.InvestmentsScreen
@@ -81,7 +82,14 @@ private fun editFixedRoute(id: Long?) = if (id == null) "fixed/edit" else "fixed
 private fun editRoute(id: Long?) = if (id == null) "edit" else "edit?id=$id"
 
 @Composable
-fun FinanceApp(vm: FinanceViewModel, investVm: InvestmentsViewModel, accountEmail: String?, onSignOut: () -> Unit) {
+fun FinanceApp(
+    vm: FinanceViewModel,
+    investVm: InvestmentsViewModel,
+    accountEmail: String?,
+    onSignOut: () -> Unit,
+    openArea: String? = null,
+    onAreaOpened: () -> Unit = {},
+) {
     val nav = rememberNavController()
     val state by vm.state.collectAsStateWithLifecycle()
     val investState by investVm.state.collectAsStateWithLifecycle()
@@ -102,6 +110,14 @@ fun FinanceApp(vm: FinanceViewModel, investVm: InvestmentsViewModel, accountEmai
             popUpTo(nav.graph.findStartDestination().id) { saveState = true }
             launchSingleTop = true
             restoreState = true
+        }
+    }
+
+    // Notificação do lembrete mensal: abre direto em Investimentos.
+    LaunchedEffect(openArea) {
+        if (openArea == AREA_INVESTMENTS) {
+            goTo(INVEST_ROUTE)
+            onAreaOpened()
         }
     }
 

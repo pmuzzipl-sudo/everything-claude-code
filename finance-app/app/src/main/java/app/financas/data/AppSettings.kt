@@ -18,4 +18,13 @@ class AppSettings(context: Context) {
     var askedNotificationPermission: Boolean
         get() = prefs.getBoolean("asked_notifications", false)
         set(value) = prefs.edit().putBoolean("asked_notifications", value).apply()
+
+    var monthlyQuotesReminder: Boolean
+        get() = prefs.getBoolean("monthly_quotes_reminder", true)
+        set(value) = prefs.edit().putBoolean("monthly_quotes_reminder", value).apply()
+
+    /** Mês (epoch month) do último lembrete mensal enviado, para não repetir. */
+    var lastMonthlyReminderMonth: Int
+        get() = prefs.getInt("last_monthly_reminder", -1)
+        set(value) = prefs.edit().putInt("last_monthly_reminder", value).apply()
 }

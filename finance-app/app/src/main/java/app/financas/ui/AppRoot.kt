@@ -30,6 +30,7 @@ import app.financas.invest.InvestRepository
 import app.financas.invest.InvestmentsViewModel
 import app.financas.invest.QuoteCache
 import app.financas.reminders.DueBillsWorker
+import app.financas.reminders.MonthlyQuotesWorker
 import app.financas.security.AppLock
 import app.financas.security.LockScreen
 import app.financas.ui.auth.LoginScreen
@@ -41,7 +42,7 @@ import kotlinx.coroutines.withContext
 
 /** Bloqueio (se ativado) → login → app com os dados da conta. */
 @Composable
-fun AppRoot() {
+fun AppRoot(openArea: String? = null, onAreaOpened: () -> Unit = {}) {
     val context = LocalContext.current
     val settings = remember { AppSettings(context) }
     if (settings.lockEnabled && !AppLock.unlocked) {
@@ -67,7 +68,14 @@ fun AppRoot() {
                 initializer { InvestmentsViewModel(InvestRepository(current.uid), QuoteCache(context)) }
             },
         )
-        FinanceApp(vm = vm, investVm = investVm, accountEmail = current.email, onSignOut = { auth.signOut() })
+        FinanceApp(
+            vm = vm,
+            investVm = investVm,
+            accountEmail = current.email,
+            onSignOut = { auth.signOut() },
+            openArea = openArea,
+            onAreaOpened = onAreaOpened,
+        )
         LegacyImportDialog(repo)
         RemindersSetup(settings)
     }
@@ -124,6 +132,7 @@ private fun RemindersSetup(settings: AppSettings) {
     val context = LocalContext.current
     val askPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
     LaunchedEffect(Unit) {
+        if (settings.monthlyQuotesReminder) MonthlyQuotesWorker.schedule(context)
         if (!settings.remindersEnabled) return@LaunchedEffect
         DueBillsWorker.schedule(context)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !settings.askedNotificationPermission &&
