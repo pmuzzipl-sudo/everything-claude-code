@@ -23,6 +23,7 @@ no próprio celular.
   patrimônio e gráfico de 3 meses de cada ativo.
 - **Metas de alocação**: defina a % que cada ativo deve ter na carteira; o app mostra a participação atual pela
   cotação, quanto falta comprar ou quanto está acima da meta, e sugere como dividir um aporte entre os ativos.
+  Ativos **congelados** (sem novos aportes) continuam no patrimônio, mas ficam fora das metas.
 - **Sincronização**: os dados ficam na conta Google do usuário (Firebase) e aparecem em todos os aparelhos.
 - **Gráficos**: gráfico de rosca com despesas ou receitas por categoria e gráfico de barras dos últimos 6 meses.
   Toque em uma categoria para ver os lançamentos dela, agrupados por descrições parecidas.

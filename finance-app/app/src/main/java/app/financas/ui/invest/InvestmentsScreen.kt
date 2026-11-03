@@ -263,7 +263,11 @@ private fun HoldingRow(h: Holding, onClick: () -> Unit) {
         Box(Modifier.size(12.dp).background(Color(h.asset.assetClass.color), CircleShape))
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(h.ticker, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+            Text(
+                h.ticker + if (h.asset.frozen) "  ❄ congelado" else "",
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+            )
             Text(
                 "${h.position.quantity} cotas • PM ${formatPrice(h.position.averagePrice)}" +
                     (h.quote?.let { " • ${formatPrice(it.price)}" } ?: ""),
@@ -298,6 +302,15 @@ private fun TargetsCard(state: InvestUiState, onOpenTargets: () -> Unit) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Metas da carteira", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
                 TextButton(onClick = onOpenTargets) { Text(if (summary.hasTargets) "Metas e aporte" else "Definir metas") }
+            }
+            if (summary.frozen.isNotEmpty()) {
+                Text(
+                    "❄ Congelados, fora das metas: ${summary.frozen.joinToString { it.ticker }} • ${formatMoney(summary.frozenCents)}. " +
+                        "As porcentagens abaixo são sobre ${formatMoney(summary.totalCents)}.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(bottom = 4.dp),
+                )
             }
             if (!summary.hasTargets) {
                 Text(

@@ -75,6 +75,30 @@ class TargetsTest {
     }
 
     @Test
+    fun frozenAssetCountsInTotalButNotInTargets() {
+        // IVVB11 congelado (R$ 5.000): base das metas = IMAB11 R$ 3.000 + HASH11 R$ 2.000 = R$ 5.000.
+        val assets = listOf(
+            Asset("IVVB11", AssetClass.EQUITY, targetBps = 5000, frozen = true),
+            Asset("IMAB11", AssetClass.FIXED_INCOME, targetBps = 5000),
+            Asset("HASH11", AssetClass.CRYPTO, targetBps = 5000),
+        )
+        val portfolio = buildPortfolio(assets, ops, quotes)
+        val s = targetsSummary(portfolio)
+        assertEquals(10_000_00, portfolio.valueCents)
+        assertEquals(5_000_00, s.totalCents)
+        assertEquals(listOf("IVVB11"), s.frozen.map { it.ticker })
+        assertEquals(5_000_00, s.frozenCents)
+        assertEquals(setOf("IMAB11", "HASH11"), s.rows.map { it.ticker }.toSet())
+        // Meta do congelado é ignorada: 50% + 50% = 100%.
+        assertTrue(s.isComplete)
+        assertEquals(0.6, s.rows.first { it.ticker == "IMAB11" }.currentRatio, 1e-9)
+        // Aporte de R$ 1.000 → base R$ 6.000, metas 50/50: HASH11 precisa 1.000, IMAB11 0.
+        val suggestion = suggestContribution(s, 1_000_00)
+        assertEquals(listOf("HASH11"), suggestion.map { it.ticker })
+        assertEquals(1_000_00L, suggestion.single().amountCents)
+    }
+
+    @Test
     fun noTargetsNoSuggestion() {
         assertTrue(suggestContribution(summary("IVVB11" to null), 1_000_00).isEmpty())
         assertTrue(suggestContribution(summary("IVVB11" to 10000), 0).isEmpty())

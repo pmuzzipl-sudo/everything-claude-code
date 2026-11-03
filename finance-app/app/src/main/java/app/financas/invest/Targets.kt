@@ -24,19 +24,26 @@ data class TargetRow(
     fun adjustCents(totalCents: Long): Long? = targetRatio?.let { (it * totalCents).roundToLong() - holding.valueCents }
 }
 
-data class TargetsSummary(val rows: List<TargetRow>, val totalCents: Long) {
+/**
+ * [totalCents] é a base das metas: só os ativos não congelados. Os congelados ficam em [frozen], somando no
+ * patrimônio mas fora das porcentagens.
+ */
+data class TargetsSummary(val rows: List<TargetRow>, val totalCents: Long, val frozen: List<Holding> = emptyList()) {
+    val frozenCents: Long get() = frozen.sumOf { it.valueCents }
     val targetSumBps: Int get() = rows.sumOf { row -> row.targetRatio?.let { (it * FULL_BPS).roundToLong().toInt() } ?: 0 }
     val hasTargets get() = rows.any { it.targetRatio != null }
     val isComplete get() = targetSumBps == FULL_BPS
 }
 
 /**
- * Participação atual de cada ativo e a meta. Inclui ativos em carteira e ativos com meta ainda sem cotas
- * (para mostrar que falta comprar). Ordenado do mais abaixo da meta para o mais acima.
+ * Participação atual de cada ativo e a meta, sobre o total dos ativos não congelados. Inclui ativos em
+ * carteira e ativos com meta ainda sem cotas (para mostrar que falta comprar). Ordenado do mais abaixo da
+ * meta para o mais acima. Metas de ativos congelados são ignoradas.
  */
 fun targetsSummary(portfolio: PortfolioSummary): TargetsSummary {
-    val total = portfolio.valueCents
-    val candidates = portfolio.holdings + portfolio.closed.filter { it.asset.targetBps != null }
+    val (frozen, active) = portfolio.holdings.partition { it.asset.frozen }
+    val total = active.sumOf { it.valueCents }
+    val candidates = active + portfolio.closed.filter { it.asset.targetBps != null && !it.asset.frozen }
     val rows = candidates.map { h ->
         TargetRow(
             holding = h,
@@ -44,7 +51,7 @@ fun targetsSummary(portfolio: PortfolioSummary): TargetsSummary {
             targetRatio = h.asset.targetBps?.let { it.toDouble() / FULL_BPS },
         )
     }.sortedWith(compareBy<TargetRow> { it.diffRatio ?: Double.MAX_VALUE }.thenBy { it.ticker })
-    return TargetsSummary(rows, total)
+    return TargetsSummary(rows, total, frozen)
 }
 
 /** Sugestão para um aporte: valor e quantas cotas inteiras dá para comprar pela cotação atual. */

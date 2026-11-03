@@ -31,6 +31,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -69,6 +70,7 @@ fun AssetDetailScreen(
     onAddOperation: () -> Unit,
     onOpenOperation: (AssetOperation) -> Unit,
     onSetClass: (AssetClass) -> Unit,
+    onSetFrozen: (Boolean) -> Unit,
     onDeleteAsset: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -109,6 +111,21 @@ fun AssetDetailScreen(
                     AssetClass.entries.forEach { c ->
                         FilterChip(selected = holding?.asset?.assetClass == c, onClick = { onSetClass(c) }, label = { Text(c.label) })
                     }
+                }
+            }
+            item {
+                val frozen = holding?.asset?.frozen == true
+                Row(Modifier.fillMaxWidth().padding(top = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Congelar ativo", style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            "Para quando você parou de investir nele: continua no patrimônio, " +
+                                "mas sai das metas e das sugestões de aporte.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(checked = frozen, onCheckedChange = onSetFrozen)
                 }
             }
             item { Text("Operações", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 16.dp, bottom = 4.dp)) }

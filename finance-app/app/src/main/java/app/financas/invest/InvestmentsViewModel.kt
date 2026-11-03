@@ -105,6 +105,8 @@ class InvestmentsViewModel(private val repo: InvestRepository, private val cache
 
     fun setAssetClass(ticker: String, assetClass: AssetClass) = repo.saveAssetClass(ticker, assetClass)
 
+    fun setFrozen(ticker: String, frozen: Boolean) = repo.setFrozen(ticker, frozen)
+
     /** Metas em pontos-base por ticker (null remove). */
     fun saveTargets(targets: Map<String, Int?>) = repo.saveTargets(targets)
 

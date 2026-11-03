@@ -71,7 +71,10 @@ fun formatBps(bps: Int): String = bpsToInput(bps) + "%"
 fun TargetsScreen(state: InvestUiState, onSave: (Map<String, Int?>) -> Unit, onBack: () -> Unit) {
     val summary = targetsSummary(state.portfolio)
     // Ativos em carteira e os cadastrados sem cotas (podem receber meta para começar a comprar).
+    // Congelados ficam fora das metas.
+    val frozenTickers = state.assets.filter { it.frozen }.map { it.ticker }.toSet()
     val tickers = (state.portfolio.holdings.map { it.ticker } + state.assets.map { it.ticker }).distinct()
+        .filter { it !in frozenTickers }
     val savedBps = state.assets.associate { it.ticker to it.targetBps }
     val inputs = remember(tickers) {
         mutableStateMapOf<String, String>().apply { tickers.forEach { put(it, savedBps[it]?.let(::bpsToInput).orEmpty()) } }
@@ -100,8 +103,9 @@ fun TargetsScreen(state: InvestUiState, onSave: (Map<String, Int?>) -> Unit, onB
         ) {
             item {
                 Text(
-                    "Defina quanto (%) de toda a carteira cada ativo deve representar. A soma deve dar 100%. " +
-                        "Deixe em branco os ativos sem meta.",
+                    "Defina quanto (%) da carteira cada ativo deve representar. A soma deve dar 100%. " +
+                        "Deixe em branco os ativos sem meta." +
+                        if (frozenTickers.isNotEmpty()) " Congelados (${frozenTickers.sorted().joinToString()}) não entram nas metas." else "",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 8.dp),

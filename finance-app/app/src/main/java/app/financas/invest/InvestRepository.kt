@@ -40,6 +40,10 @@ class InvestRepository(uid: String, private val db: FirebaseFirestore = Firebase
         assets.document(ticker).set(mapOf("assetClass" to assetClass.name), SetOptions.merge())
     }
 
+    fun setFrozen(ticker: String, frozen: Boolean) {
+        assets.document(ticker).set(mapOf("frozen" to frozen), SetOptions.merge())
+    }
+
     /** Grava as metas de vários ativos de uma vez; null remove a meta. Não mexe na classe. */
     fun saveTargets(targets: Map<String, Int?>) {
         if (targets.isEmpty()) return

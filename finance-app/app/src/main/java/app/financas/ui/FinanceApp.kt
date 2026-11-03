@@ -189,6 +189,7 @@ fun FinanceApp(vm: FinanceViewModel, investVm: InvestmentsViewModel, accountEmai
                     onAddOperation = { nav.navigate(operationRoute(null, ticker)) },
                     onOpenOperation = { nav.navigate(operationRoute(it.id, null)) },
                     onSetClass = { investVm.setAssetClass(ticker, it) },
+                    onSetFrozen = { investVm.setFrozen(ticker, it) },
                     onDeleteAsset = { investVm.deleteAsset(ticker); nav.popBackStack() },
                     onBack = { nav.popBackStack() },
                 )
