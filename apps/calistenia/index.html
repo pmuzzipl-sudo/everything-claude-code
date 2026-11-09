@@ -223,6 +223,7 @@ ol.plain { margin: 0; padding-left: 1.3em; display: grid; gap: 6px; }
 <script>
 (() => {
 "use strict";
+const IN_APP = /CalisteniaApp/.test(navigator.userAgent);
 
 /* ---------- Plano (do PDF) ---------- */
 const LADDERS = {
@@ -325,7 +326,7 @@ const Store = {
   async init() {
     const loadTimer = setTimeout(() => { if (S.mode === "loading") setSync("Sem conexão com os dados ainda…"); }, 10000);
     try {
-      const use = window.claude && window.claude.use;
+      const use = !IN_APP && window.claude && window.claude.use;
       if (use) {
         const [db, user] = await Promise.all([window.claude.use("db"), window.claude.use("user")]);
         const uid = user ? await user.id() : null;
@@ -350,7 +351,7 @@ const Store = {
     this.local = lsGet("cal.local", {});
     S.mode = "local";
     ingest(this.local);
-    setSync("Salvo só neste navegador");
+    setSync(IN_APP ? "Salvo neste aparelho" : "Salvo só neste navegador");
   },
   async put(id, data) {
     if (S.mode === "db") return this.col.doc(id).set(data);
@@ -460,7 +461,7 @@ function renderTreino() {
   if (!S.profile) notes.push(`<div class="notice info">Primeiro treino? Comece pela aba <a class="linkish" href="#testes">Testes</a> para escolher o nível de cada exercício. A semana 1 começa no dia em que você salvar o primeiro treino.</div>`);
   if ([4, 8, 12].includes(w) && !S.tests.some((t) => t.week === w)) notes.push(`<div class="notice">Semana ${w}: refaça o teste no primeiro treino da semana. <a class="linkish" href="#testes">Registrar teste</a></div>`);
   if (w === 8) notes.push(`<div class="notice">Muito cansaço acumulado? Faça esta semana com metade das séries (recuperação).</div>`);
-  if (S.mode === "local") notes.push(`<div class="notice">Seus treinos estão salvos só neste navegador. Abra o app no claude.ai com sua conta para guardar no seu perfil.</div>`);
+  if (S.mode === "local" && !IN_APP) notes.push(`<div class="notice">Seus treinos estão salvos só neste navegador. Abra o app no claude.ai com sua conta para guardar no seu perfil.</div>`);
 
   const exHtml = exs.map((ex, i) => {
     const e = d.entries[i];
@@ -624,8 +625,14 @@ function renderPlano() {
       <h2>Ajustes</h2>
       <div class="field"><label class="label" for="start">Início do plano (semana 1)</label>
         <div class="row"><input id="start" type="date" value="${h(startDate())}" style="flex:1;min-width:0"><button type="button" class="btn" id="savestart">Salvar data</button></div></div>
-      <p class="small muted">${S.mode === "db" ? "Seus registros ficam na sua conta e só você os vê." : S.mode === "local" ? "Registros salvos apenas neste navegador." : "Carregando seus dados…"}</p>
-    </section>`;
+      <p class="small muted">${S.mode === "db" ? "Seus registros ficam na sua conta e só você os vê." : S.mode === "local" ? (IN_APP ? "Registros salvos neste aparelho." : "Registros salvos apenas neste navegador.") : "Carregando seus dados…"}</p>
+    </section>
+    ${S.mode === "local" ? `<section class="card">
+      <h2>Backup</h2>
+      <p class="small muted">Copie o backup e guarde (num e-mail ou nota) antes de trocar de celular ou desinstalar o app. Para restaurar, cole o texto aqui e toque em Restaurar.</p>
+      <div class="field"><label class="label" for="backup">Dados do backup</label><textarea id="backup" rows="4" spellcheck="false" placeholder="Cole aqui um backup para restaurar"></textarea></div>
+      <div class="row"><button type="button" class="btn" id="copybackup">Copiar backup</button><button type="button" class="btn" id="restorebackup">Restaurar</button></div>
+    </section>` : ""}`;
 }
 
 function render() {
@@ -712,6 +719,21 @@ view.addEventListener("click", async (ev) => {
     if (pendingDel !== b.dataset.del) { pendingDel = b.dataset.del; b.textContent = "Confirmar exclusão"; return; }
     pendingDel = null; b.disabled = true;
     try { await Store.del(b.dataset.del); toast("Excluído"); } catch (e) { b.disabled = false; toast("Não foi possível excluir: " + (e.message || e.code)); }
+    return;
+  }
+  if (b.id === "copybackup") {
+    const ta = $("#backup"); const txt = JSON.stringify(Store.local);
+    ta.value = txt;
+    try { await navigator.clipboard.writeText(txt); toast("Backup copiado"); }
+    catch { ta.focus(); ta.select(); toast("Selecione o texto e copie"); }
+    return;
+  }
+  if (b.id === "restorebackup") {
+    let data;
+    try { data = JSON.parse($("#backup").value); } catch { toast("Backup inválido: cole o texto completo"); return; }
+    if (!data || typeof data !== "object" || Array.isArray(data)) { toast("Backup inválido"); return; }
+    Store.local = { ...Store.local, ...data }; lsSet("cal.local", Store.local); ingest(Store.local);
+    toast("Backup restaurado");
     return;
   }
   if (b.id === "savestart") {

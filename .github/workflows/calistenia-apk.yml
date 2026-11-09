@@ -1,0 +1,52 @@
+name: Calistenia APK
+
+on:
+  push:
+    paths:
+      - 'apps/calistenia/**'
+      - '.github/workflows/calistenia-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: calistenia-apk
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/calistenia/android
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build APK
+        run: ./gradlew --no-daemon assembleRelease
+
+      - name: Rename APK
+        run: cp app/build/outputs/apk/release/app-release.apk "$GITHUB_WORKSPACE/Calistenia.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Calistenia-apk
+          path: Calistenia.apk
+
+      - name: Publish to release "calistenia-latest"
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete calistenia-latest --yes --cleanup-tag || true
+          gh release create calistenia-latest "$GITHUB_WORKSPACE/Calistenia.apk" \
+            --target "$GITHUB_SHA" \
+            --title "Diário de Calistenia (build ${{ github.run_number }})" \
+            --notes "APK do Diário de Calistenia. No Android: baixe Calistenia.apk, abra o arquivo e permita instalar apps desta fonte."

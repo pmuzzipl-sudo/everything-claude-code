@@ -1,0 +1,68 @@
+plugins {
+    id 'com.android.application'
+}
+
+// Envolve a página do app (../index.html, sem <head>) num documento HTML completo
+def webSrc = rootProject.file('../index.html')
+def webOut = layout.buildDirectory.dir('generated/web')
+def wrapWeb = tasks.register('wrapWeb') {
+    inputs.file webSrc
+    outputs.dir webOut
+    doLast {
+        def dir = webOut.get().asFile
+        dir.mkdirs()
+        def head = '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">' +
+            '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+            '<style>:root{color-scheme:light}body{margin:0;font:14px system-ui,sans-serif}' +
+            'img{max-width:100%}[hidden]{display:none!important}</style></head><body>'
+        new File(dir, 'index.html').setText(head + webSrc.getText('UTF-8') + '</body></html>', 'UTF-8')
+    }
+}
+
+def runNumber = (System.getenv('GITHUB_RUN_NUMBER') ?: '1') as int
+
+android {
+    namespace 'com.pedro.calistenia'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.pedro.calistenia'
+        minSdk 24
+        targetSdk 34
+        versionCode runNumber
+        versionName "1.0.${runNumber}"
+    }
+
+    // Chave fixa para que novas versões instalem por cima da anterior.
+    // Serve só para instalação manual (sideload), não é segredo.
+    signingConfigs {
+        release {
+            storeFile file('calistenia.keystore')
+            storePassword 'calistenia'
+            keyAlias 'calistenia'
+            keyPassword 'calistenia'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    sourceSets {
+        main.assets.srcDirs += webOut
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+tasks.named('preBuild') { dependsOn wrapWeb }
+
+dependencies {
+    implementation 'androidx.webkit:webkit:1.12.1'
+}
