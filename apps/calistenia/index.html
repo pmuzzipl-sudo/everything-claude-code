@@ -114,7 +114,24 @@ details.warm[open] summary::after { content: "–"; }
 .ex-title h3 { flex: 1; min-width: 0; }
 .rx { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: .9rem; color: var(--muted); }
 .rx b { color: var(--ink); font-family: var(--mono); font-weight: 500; }
-.ex select { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--chalk); font-size: .95rem; }
+.lad { display: grid; gap: 8px; margin-top: 4px; }
+.lad-head { display: flex; justify-content: space-between; gap: 10px; }
+.steps { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; height: 78px; align-items: end; }
+.step { border: 0; background: none; padding: 0; height: 100%; display: grid; grid-template-rows: 1fr auto; cursor: pointer; border-radius: 6px; }
+.step .bar { align-self: end; height: calc(var(--h) * 56px); background: var(--sunk); border: 1px solid var(--line); border-radius: 5px 5px 0 0; transition: background .15s; }
+.step.below .bar { background: color-mix(in srgb, var(--accent) 30%, var(--sunk)); border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); }
+.step.on .bar { background: var(--accent); border-color: var(--accent); }
+.step.later:not(.on) .bar { border-style: dashed; }
+.step:hover:not(.on) .bar { border-color: var(--accent); }
+.step .n { font-family: var(--mono); font-size: .75rem; color: var(--muted); padding-top: 3px; text-align: center; }
+.step.on .n { color: var(--accent); font-weight: 700; }
+.step.isplan .n::after, .plandot { content: "•"; color: var(--warn); font-weight: 700; }
+.step.isplan .n::after { margin-left: 2px; }
+.lad-name { font-family: var(--display); font-weight: 600; font-size: 1.15rem; line-height: 1.15; }
+.lad-nav { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.lad-nav .btn { display: grid; gap: 2px; text-align: left; padding: 8px 10px; min-width: 0; }
+.lad-nav .btn:last-child { text-align: right; }
+.lad-nav .btn small { font-weight: 400; font-size: .75rem; color: var(--muted); overflow-wrap: anywhere; }
 .last { font-size: .85rem; color: var(--muted); }
 .pill { display: inline-flex; align-items: center; gap: 6px; font-size: .8rem; font-weight: 600; padding: 4px 9px; border-radius: 999px; background: var(--sunk); width: fit-content; }
 .pill.up { background: var(--good-soft); color: var(--good); }
@@ -239,47 +256,47 @@ const LADDERS = {
 const PATTERN_LABEL = { push_h: "Empurrar horizontal", pull_v: "Puxar vertical", pull_h: "Puxar horizontal", push_v: "Empurrar vertical", dip: "Mergulho", legs: "Pernas", post: "Posterior / glúteo", core: "Core" };
 
 // E(nome, padrão, séries, min, max, descanso s, opções)
-const E = (name, pattern, sets, min, max, rest, o = {}) => ({ name, pattern, sets, min, max, rest, unit: o.s ? "s" : "reps", side: o.side || "", restLabel: o.rl || "" });
+const E = (name, pattern, sets, min, max, rest, o = {}) => ({ name, pattern, sets, min, max, rest, unit: o.s ? "s" : "reps", side: o.side || "", restLabel: o.rl || "", lv: o.lv ?? null, same: o.same || null });
 const PLAN = {
   1: { name: "Base", weeks: "1–4", goal: "Aprender a técnica e fortalecer tendões e articulações (≈6–9 séries por grupo na semana).",
-    A: [E("Flexão inclinada (mãos em banco/mesa) ou flexão de joelhos", "push_h", 3, 6, 12, 90),
-        E("Barra fixa negativa (salte e desça em 3–5 s)", "pull_v", 3, 3, 5, 120),
-        E("Agachamento livre", "legs", 3, 10, 20, 90),
-        E("Ponte de glúteo", "post", 3, 12, 20, 60),
-        E("Mergulho no banco (joelhos dobrados)", "dip", 2, 8, 12, 90),
-        E("Prancha frontal", "core", 3, 20, 40, 60, { s: 1 })],
-    B: [E("Remada invertida inclinada (corpo mais em pé)", "pull_h", 3, 6, 12, 90),
-        E("Flexão pike com pés no chão", "push_v", 3, 6, 10, 90),
-        E("Afundo estático (split squat)", "legs", 3, 8, 12, 90, { side: "cada perna" }),
-        E("Flexão (mesma variação do treino A)", "push_h", 2, 8, 15, 90),
-        E("Pendurar na barra (dead hang) + retração escapular", "pull_v", 3, 20, 40, 60, { s: 1 }),
-        E("Hollow body com joelhos dobrados", "core", 3, 15, 30, 60, { s: 1 })] },
+    A: [E("Flexão inclinada (mãos em banco/mesa) ou flexão de joelhos", "push_h", 3, 6, 12, 90, { lv: 1 }),
+        E("Barra fixa negativa (salte e desça em 3–5 s)", "pull_v", 3, 3, 5, 120, { lv: 1 }),
+        E("Agachamento livre", "legs", 3, 10, 20, 90, { lv: 0 }),
+        E("Ponte de glúteo", "post", 3, 12, 20, 60, { lv: 0 }),
+        E("Mergulho no banco (joelhos dobrados)", "dip", 2, 8, 12, 90, { lv: 0 }),
+        E("Prancha frontal", "core", 3, 20, 40, 60, { s: 1, lv: 0 })],
+    B: [E("Remada invertida inclinada (corpo mais em pé)", "pull_h", 3, 6, 12, 90, { lv: 0 }),
+        E("Flexão pike com pés no chão", "push_v", 3, 6, 10, 90, { lv: 1 }),
+        E("Afundo estático (split squat)", "legs", 3, 8, 12, 90, { side: "cada perna", lv: 1 }),
+        E("Flexão (mesma variação do treino A)", "push_h", 2, 8, 15, 90, { lv: 1, same: "1A0" }),
+        E("Pendurar na barra (dead hang) + retração escapular", "pull_v", 3, 20, 40, 60, { s: 1, lv: 0 }),
+        E("Hollow body com joelhos dobrados", "core", 3, 15, 30, 60, { s: 1, lv: 1 })] },
   2: { name: "Construção", weeks: "5–8", goal: "Chegar a ≈10 séries semanais por grupo e trocar para variações mais difíceis.",
-    A: [E("Flexão completa (ou inclinada mais baixa)", "push_h", 4, 6, 12, 90),
-        E("Barra fixa com elástico ou negativas de 5 s (3+ → barras completas)", "pull_v", 4, 3, 8, 150, { rl: "2–3 min" }),
-        E("Agachamento búlgaro (pé de trás no banco)", "legs", 3, 8, 12, 120, { side: "cada perna" }),
-        E("Ponte de glúteo unilateral", "post", 3, 10, 15, 60, { side: "cada perna" }),
-        E("Mergulho no banco com pernas estendidas ou paralelas com apoio dos pés", "dip", 3, 8, 12, 90),
+    A: [E("Flexão completa (ou inclinada mais baixa)", "push_h", 4, 6, 12, 90, { lv: 3 }),
+        E("Barra fixa com elástico ou negativas de 5 s (3+ → barras completas)", "pull_v", 4, 3, 8, 150, { rl: "2–3 min", lv: 2 }),
+        E("Agachamento búlgaro (pé de trás no banco)", "legs", 3, 8, 12, 120, { side: "cada perna", lv: 3 }),
+        E("Ponte de glúteo unilateral", "post", 3, 10, 15, 60, { side: "cada perna", lv: 1 }),
+        E("Mergulho no banco com pernas estendidas ou paralelas com apoio dos pés", "dip", 3, 8, 12, 90, { lv: 1 }),
         E("Prancha lateral", null, 3, 20, 40, 60, { s: 1, side: "cada lado" })],
-    B: [E("Remada invertida com corpo horizontal (pés no chão)", "pull_h", 4, 6, 12, 90),
-        E("Flexão pike com pés elevados em banco", "push_v", 3, 6, 10, 120),
-        E("Afundo para trás alternado", "legs", 3, 10, 12, 90, { side: "cada perna" }),
-        E("Flexão diamante ou com mãos fechadas (inclinada se necessário)", "push_h", 3, 6, 12, 90),
+    B: [E("Remada invertida com corpo horizontal (pés no chão)", "pull_h", 4, 6, 12, 90, { lv: 3 }),
+        E("Flexão pike com pés elevados em banco", "push_v", 3, 6, 10, 120, { lv: 2 }),
+        E("Afundo para trás alternado", "legs", 3, 10, 12, 90, { side: "cada perna", lv: 2 }),
+        E("Flexão diamante ou com mãos fechadas (inclinada se necessário)", "push_h", 3, 6, 12, 90, { lv: 4 }),
         E("Barra australiana supinada ou isometria no topo da barra", null, 3, 6, 10, 90),
-        E("Elevação de joelhos pendurado", "core", 3, 8, 15, 60)] },
+        E("Elevação de joelhos pendurado", "core", 3, 8, 15, 60, { lv: 3 })] },
   3: { name: "Intensificação", weeks: "9–12", goal: "Variações mais difíceis, 10–15 séries por grupo. Abra com o exercício mais pesado (5–8 reps).",
-    A: [E("Barra fixa completa (pronada)", "pull_v", 4, 3, 8, 150, { rl: "2–3 min" }),
-        E("Flexão com pés elevados ou flexão archer assistida", "push_h", 4, 6, 10, 120),
-        E("Agachamento búlgaro com descida lenta (3 s) ou com mochila", "legs", 4, 6, 10, 120, { side: "cada perna" }),
-        E("Mergulho nas paralelas", "dip", 3, 5, 10, 120),
-        E("Hip thrust unilateral (ombros no banco)", "post", 3, 10, 15, 60, { side: "cada perna" }),
-        E("Hollow body com pernas estendidas", "core", 3, 20, 40, 60, { s: 1 })],
-    B: [E("Flexão pike elevada com mais ângulo (quadril sobre os ombros)", "push_v", 4, 5, 8, 120),
-        E("Remada invertida com pés elevados", "pull_h", 4, 6, 12, 90),
+    A: [E("Barra fixa completa (pronada)", "pull_v", 4, 3, 8, 150, { rl: "2–3 min", lv: 3 }),
+        E("Flexão com pés elevados ou flexão archer assistida", "push_h", 4, 6, 10, 120, { lv: 4 }),
+        E("Agachamento búlgaro com descida lenta (3 s) ou com mochila", "legs", 4, 6, 10, 120, { side: "cada perna", lv: 3 }),
+        E("Mergulho nas paralelas", "dip", 3, 5, 10, 120, { lv: 4 }),
+        E("Hip thrust unilateral (ombros no banco)", "post", 3, 10, 15, 60, { side: "cada perna", lv: 3 }),
+        E("Hollow body com pernas estendidas", "core", 3, 20, 40, 60, { s: 1, lv: 2 })],
+    B: [E("Flexão pike elevada com mais ângulo (quadril sobre os ombros)", "push_v", 4, 5, 8, 120, { lv: 3 }),
+        E("Remada invertida com pés elevados", "pull_h", 4, 6, 12, 90, { lv: 4 }),
         E("Barra fixa supinada (chin-up)", null, 3, 4, 8, 120),
-        E("Agachamento skater ou pistol assistido (segurando um apoio)", "legs", 3, 5, 10, 120, { side: "cada perna" }),
-        E("Flexão diamante", "push_h", 3, 8, 15, 90),
-        E("Elevação de pernas estendidas pendurado (ou joelhos até o peito)", "core", 3, 6, 12, 60)] }
+        E("Agachamento skater ou pistol assistido (segurando um apoio)", "legs", 3, 5, 10, 120, { side: "cada perna", lv: 4 }),
+        E("Flexão diamante", "push_h", 3, 8, 15, 90, { lv: 4 }),
+        E("Elevação de pernas estendidas pendurado (ou joelhos até o peito)", "core", 3, 6, 12, 60, { lv: 4 })] }
 };
 const WARMUP = [
   "3–4 min de movimento leve: polichinelos, corrida no lugar ou pular corda",
@@ -391,13 +408,17 @@ function history(key) { // entradas anteriores do mesmo exercício, mais recente
   for (const s of S.sessions) for (const e of s.entries || []) if (e.key === key) out.push({ ...e, date: s.date });
   return out;
 }
+function normVar(ex, v) {
+  if (!ex.pattern) return ex.name;
+  const lad = LADDERS[ex.pattern];
+  return lad.includes(v) ? v : lad[ex.lv ?? 0];
+}
 function lastVariationFor(key, ex) {
   const hst = history(key);
-  if (hst.length) return hst[0].variation;
-  if (ex.pattern) { // mesma escada usada em outro treino/fase
-    for (const s of S.sessions) for (const e of s.entries || []) if (e.pattern === ex.pattern && e.variation && LADDERS[ex.pattern].includes(e.variation)) return e.variation;
-  }
-  return ex.name;
+  if (hst.length) return normVar(ex, hst[0].variation);
+  // "Flexão (mesma variação do treino A)": copia a variação usada no treino A
+  if (ex.same) { const a = history(ex.same); if (a.length) return normVar(ex, a[0].variation); }
+  return normVar(ex, null);
 }
 function progressHint(key, ex, variation) {
   const hst = history(key).filter((e) => e.variation === variation);
@@ -465,9 +486,21 @@ function renderTreino() {
 
   const exHtml = exs.map((ex, i) => {
     const e = d.entries[i];
-    const lad = ex.pattern ? LADDERS[ex.pattern] : [];
-    const opts = [ex.name, ...lad.filter((v) => v !== ex.name)];
-    if (e.variation && !opts.includes(e.variation)) opts.unshift(e.variation);
+    e.variation = normVar(ex, e.variation);
+    const lad = ex.pattern ? LADDERS[ex.pattern] : null;
+    const cur = lad ? lad.indexOf(e.variation) : -1;
+    const ladder = lad ? `<div class="lad">
+        <div class="lad-head"><span class="label">Variação de hoje</span><span class="label num">Nível ${cur + 1} de ${lad.length}</span></div>
+        <div class="steps" role="radiogroup" aria-label="Nível de dificuldade: ${h(PATTERN_LABEL[ex.pattern])}">
+          ${lad.map((v, j) => `<button type="button" role="radio" aria-checked="${j === cur}" class="step${j === cur ? " on" : j < cur ? " below" : ""}${j >= 4 ? " later" : ""}${j === ex.lv ? " isplan" : ""}" style="--h:${(j + 1) / lad.length}" data-lvl="${i}:${j}" title="${h(v)}" aria-label="Nível ${j + 1}: ${h(v)}"><span class="bar"></span><span class="n">${j + 1}</span></button>`).join("")}
+        </div>
+        <p class="lad-name">${h(e.variation)}</p>
+        <p class="lad-note small muted">${h(PATTERN_LABEL[ex.pattern])} · <span class="plandot">•</span> nível do plano nesta fase: ${ex.lv + 1}${cur > ex.lv ? " · você está acima do plano" : cur < ex.lv ? " · você está abaixo do plano" : ""}</p>
+        <div class="lad-nav">
+          <button type="button" class="btn" data-step="${i}:-1" ${cur <= 0 ? "disabled" : ""}><span>− Mais fácil</span>${cur > 0 ? `<small>${h(lad[cur - 1])}</small>` : "<small>Já está no nível mais fácil</small>"}</button>
+          <button type="button" class="btn" data-step="${i}:1" ${cur >= lad.length - 1 ? "disabled" : ""}><span>Mais difícil +</span>${cur < lad.length - 1 ? `<small>${h(lad[cur + 1])}</small>` : "<small>Já está no nível mais difícil</small>"}</button>
+        </div>
+      </div>` : `<p class="small muted">Variação fixa do plano (sem escada de progressão).</p>`;
     const last = history(e.key)[0];
     const hint = progressHint(e.key, ex, e.variation);
     const unit = ex.unit === "s" ? "s" : "reps";
@@ -482,9 +515,8 @@ function renderTreino() {
     return `<section class="card ex">
       <div class="ex-head">
         <div class="ex-title"><span class="idx">${i + 1}</span><h3>${h(ex.name)}</h3></div>
-        <div class="rx"><span>Séries × ${unit}: <b>${ex.sets} × ${ex.min}–${ex.max}${ex.unit === "s" ? " s" : ""}</b>${ex.side ? " " + h(ex.side) : ""}</span><span>Descanso <b>${fmtRest(ex.rest, ex.restLabel)}</b></span>${ex.pattern ? `<span>${h(PATTERN_LABEL[ex.pattern])}</span>` : ""}</div>
-        <label class="label" for="v-${i}">Variação de hoje</label>
-        <select id="v-${i}" data-var="${i}">${opts.map((o) => `<option${o === e.variation ? " selected" : ""}>${h(o)}</option>`).join("")}</select>
+        <div class="rx"><span>Séries × ${unit}: <b>${ex.sets} × ${ex.min}–${ex.max}${ex.unit === "s" ? " s" : ""}</b>${ex.side ? " " + h(ex.side) : ""}</span><span>Descanso <b>${fmtRest(ex.rest, ex.restLabel)}</b></span></div>
+        ${ladder}
         ${last ? `<p class="last">Última vez (${fmtDate(last.date)}): <span class="num">${last.sets.filter((v) => v !== "" && v != null).join(" · ") || "—"}</span>${last.variation !== e.variation ? ` em “${h(last.variation)}”` : ""}</p>` : `<p class="last">Sem registro anterior deste exercício.</p>`}
         ${hint ? `<span class="pill ${hint.cls}">${h(hint.text)}</span>` : ""}
       </div>
@@ -707,6 +739,15 @@ view.addEventListener("click", async (ev) => {
       if (pendingDel !== "switch") { pendingDel = "switch"; toast("Há séries anotadas. Toque de novo para trocar e descartá-las."); return; }
     }
     pendingDel = null; draft = null; lsDel("cal.draft"); S.choice = wk; S.phaseChoice = ph; render(); return;
+  }
+  if (b.dataset.lvl || b.dataset.step) {
+    const [i, n] = (b.dataset.lvl || b.dataset.step).split(":").map(Number);
+    const ex = PLAN[draft.phase][draft.workout][i], lad = LADDERS[ex.pattern];
+    const cur = lad.indexOf(draft.entries[i].variation);
+    const j = b.dataset.lvl ? n : Math.min(lad.length - 1, Math.max(0, cur + n));
+    draft.entries[i].variation = lad[j]; saveDraft(); render();
+    const again = document.querySelector(`[data-lvl="${i}:${j}"]`); if (again) again.focus({ preventScroll: true });
+    return;
   }
   if (b.dataset.addset != null) { draft.entries[+b.dataset.addset].sets.push(""); saveDraft(); render(); return; }
   if (b.dataset.rmset != null) { draft.entries[+b.dataset.rmset].sets.pop(); saveDraft(); render(); return; }
